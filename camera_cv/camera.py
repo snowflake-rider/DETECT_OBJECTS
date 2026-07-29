@@ -9,39 +9,45 @@ sys.path.append(str(ROOT))
 from models.yolo_world_module import YOLO_World_Manager
 from AVFoundation import AVCaptureDevice, AVMediaTypeVideo
 
+
 class Camera_Manager:
     def __init__(self):
         self.__backend = self._select_backend()
         self.__available = self._find_cameras()
-        if len(self.__available): 
-            self.__manager_obj = cv2.VideoCapture(self.__available[0] ,self.__backend)
-            self.__classes=[
+        if len(self.__available):
+            self.__manager_obj = cv2.VideoCapture(1, self.__backend)
+            self.__classes = [
                 "smartphone",
                 "wristwatch",
                 "keyboard",
                 "person",
             ]
-    def _select_backend(self)->int:
+
+    def _select_backend(self) -> int:
         os_name = platform.system()
         print(f"os name : {os_name}")
         backend_map = {
             "Darwin": cv2.CAP_AVFOUNDATION,  # macOS
-            "Linux": cv2.CAP_V4L2,           # Linux
-            "Windows": cv2.CAP_MSMF,         # Windows 10/11
+            "Linux": cv2.CAP_V4L2,  # Linux
+            "Windows": cv2.CAP_MSMF,  # Windows 10/11
         }
-        return backend_map.get(os_name,cv2.CAP_ANY)
-    
-    def _find_cameras(self,max_index=10):
+        return backend_map.get(os_name, cv2.CAP_ANY)
+
+    def _find_cameras(self, max_index=10):
         backend = self._select_backend()
+
         available = []
+
         if platform.system() == "Darwin":
             devices = AVCaptureDevice.devicesWithMediaType_(AVMediaTypeVideo)
 
             for index, device in enumerate(devices):
                 name = device.localizedName()
+                print(f"{index}: {device}")
                 print(f"name:{name.lower()}")
                 # iPhone 카메라는 제외
                 if "iphone" not in name.lower():
+                    print(index)
                     available.append(index)
                     break
 
@@ -59,44 +65,46 @@ class Camera_Manager:
                         print(f"[△] Camera {index} opened, but cannot read frame")
 
                 cap.release()
-        
+
         return available
 
-    
     def start_record(self):
-        
-        if self.__manager_obj is None or not self.__manager_obj.isOpened() or len(self.__available)<=0:
+        if (
+            self.__manager_obj is None
+            or not self.__manager_obj.isOpened()
+            or len(self.__available) <= 0
+        ):
             self._gc_resource()
             raise RuntimeError("camera unavilable!")
         try:
-            yolo_manager= YOLO_World_Manager(confidence=0.35)
+            yolo_manager = YOLO_World_Manager(confidence=0.35)
             yolo_manager.load()
             yolo_manager.set_classes(self.__classes)
         except Exception as e:
             print(e)
             self._gc_resource()
-            return 
+            return
         while True:
             is_success, frame = self.__manager_obj.read()
             if not is_success:
                 print("cannot read frame")
                 break
-            frame_height, frame_width = frame.shape[:2]      
-            boxes,names = yolo_manager.predict(frame=frame)      
+            frame_height, frame_width = frame.shape[:2]
+            boxes, names = yolo_manager.predict(frame=frame)
 
             for box in boxes:
-                x1,y1,x2,y2 = box.xyxyn[0].tolist()
-                x1=int(x1*frame_width)
-                y1=int(y1*frame_height)
-                x2=int(x2*frame_width)
-                y2=int(y2*frame_height)
+                x1, y1, x2, y2 = box.xyxyn[0].tolist()
+                x1 = int(x1 * frame_width)
+                y1 = int(y1 * frame_height)
+                x2 = int(x2 * frame_width)
+                y2 = int(y2 * frame_height)
                 confidence = float(box.conf)
                 class_id = int(box.cls[0].item())
                 class_name = names[class_id]
                 cv2.rectangle(
                     frame,
-                    (x1,y1),
-                    (x2,y2),
+                    (x1, y1),
+                    (x2, y2),
                     (0, 255, 0),
                     2,
                 )
@@ -112,17 +120,19 @@ class Camera_Manager:
                     2,
                 )
 
-            cv2.imshow("Camera",frame)
-            if cv2.waitKey(1)&0xFF==ord("q"):
+            cv2.imshow("Camera", frame)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
         yolo_manager.close()
         self._gc_resource()
+
     def _gc_resource(self):
         if self.__manager_obj is not None:
             self.__manager_obj.release()
         cv2.destroyAllWindows()
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     try:
         camera_manager = Camera_Manager()
         camera_manager.start_record()
