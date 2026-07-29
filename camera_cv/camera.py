@@ -1,5 +1,12 @@
 import cv2
 import platform
+# import sys
+# from pathlib import Path
+
+# ROOT = Path(__file__).resolve().parent.parent
+# sys.path.append(str(ROOT))
+
+from ..models.yolo_world_module import YOLO_World_Manager
 
 class Camera_Manager:
     def __init__(self):
@@ -15,15 +22,17 @@ class Camera_Manager:
         }
         return backend_map.get(os_name,cv2.CAP_ANY)
     def start_record(self):
-        
+
         if self.__manager_obj is None or not self.__manager_obj.isOpened():
             self.gc_resource()
             raise RuntimeError("camera unavilable!")
+        yolo_manager= YOLO_World_Manager(confidence=0.35)
         while True:
             is_success, frame = self.__manager_obj.read()
             if not is_success:
                 print("cannot read frame")
                 break
+
             cv2.imshow("Camera",frame)
             if cv2.waitKey(1)&0xFF==ord("q"):
                 break

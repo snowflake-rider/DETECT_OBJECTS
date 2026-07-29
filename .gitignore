@@ -1,0 +1,66 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+.conda/
+
+# Packaging and build output
+build/
+dist/
+*.egg-info/
+
+# Environment variables and local secrets
+.env
+.env.*
+!.env.example
+
+# IDE and editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Model weights and exported inference artifacts
+*.pt
+*.pth
+*.onnx
+*.engine
+*.torchscript
+*.tflite
+*.mlmodel
+
+# Training, inference, and application output
+runs/
+outputs/
+results/
+logs/
+wandb/
+
+# Local datasets and temporary media
+data/
+datasets/
+recordings/
+*.wav
+*.mp3
+*.mp4
+*.mov
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.log
+
