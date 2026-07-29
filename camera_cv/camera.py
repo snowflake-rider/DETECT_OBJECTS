@@ -7,17 +7,20 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT))
 
 from models.yolo_world_module import YOLO_World_Manager
+from AVFoundation import AVCaptureDevice, AVMediaTypeVideo
 
 class Camera_Manager:
     def __init__(self):
-        self__backend = self._select_backend()
-        self.__manager_obj = cv2.VideoCapture(0,self__backend)
-        self.__classes=[
-            "smartphone",
-            "wristwatch",
-            "keyboard",
-            "person",
-        ]
+        self.__backend = self._select_backend()
+        self.__available = self._find_cameras()
+        if len(self.__available): 
+            self.__manager_obj = cv2.VideoCapture(self.__available[0] ,self.__backend)
+            self.__classes=[
+                "smartphone",
+                "wristwatch",
+                "keyboard",
+                "person",
+            ]
     def _select_backend(self)->int:
         os_name = platform.system()
         print(f"os name : {os_name}")
@@ -27,9 +30,42 @@ class Camera_Manager:
             "Windows": cv2.CAP_MSMF,         # Windows 10/11
         }
         return backend_map.get(os_name,cv2.CAP_ANY)
+    
+    def _find_cameras(self,max_index=10):
+        backend = self._select_backend()
+        available = []
+        if platform.system() == "Darwin":
+            devices = AVCaptureDevice.devicesWithMediaType_(AVMediaTypeVideo)
+
+            for index, device in enumerate(devices):
+                name = device.localizedName()
+                print(f"name:{name.lower()}")
+                # iPhone 카메라는 제외
+                if "iphone" not in name.lower():
+                    available.append(index)
+                    break
+
+        else:
+            for index in range(max_index):
+                cap = cv2.VideoCapture(index, backend)
+                if cap.isOpened():
+                    ret, frame = cap.read()
+
+                    if ret and frame is not None:
+                        h, w = frame.shape[:2]
+                        print(f"[O] Camera {index} ({w}x{h})")
+                        available.append(index)
+                    else:
+                        print(f"[△] Camera {index} opened, but cannot read frame")
+
+                cap.release()
+        
+        return available
+
+    
     def start_record(self):
         
-        if self.__manager_obj is None or not self.__manager_obj.isOpened():
+        if self.__manager_obj is None or not self.__manager_obj.isOpened() or len(self.__available)<=0:
             self._gc_resource()
             raise RuntimeError("camera unavilable!")
         try:
