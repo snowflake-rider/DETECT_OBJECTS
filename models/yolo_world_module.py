@@ -9,9 +9,9 @@ from typing import Sequence
 import numpy as np
 import torch
 from ultralytics import YOLOWorld
-from ultralytics.engine.results import Results
+from ultralytics.engine.results import Boxes
 
-from device_selector import DeviceInfo, DeviceSelector
+from models.device_selector import DeviceInfo, DeviceSelector
 from typing import Self
 
 class YOLO_World_Manager:
@@ -52,22 +52,23 @@ class YOLO_World_Manager:
             f"{self._device_info.device} "
             f"({self._device_info.name})"
         )
-
         self._model = YOLOWorld(str(self._model_path))
 
+    def set_classes(self,classes:Sequence[str])->None:
+        self.__classes = self._normalize_classes(classes)
+        self._model.set_classes(self.__classes)
 
-    def predict(self, frame: np.ndarray|str,classes:Sequence[str]) -> Results:
+    def predict(self, frame: np.ndarray|str) -> tuple[Boxes, dict[int, str]]:
         model = self._require_model()
-        model.set_classes(classes)
         results = model.predict(
             source=frame,
             device=self._device_info.device,
             conf=self._confidence,
             imgsz=self._image_size,
             verbose=False,
-        )
+        )[0]
 
-        return results
+        return results.boxes.cpu(),results.names
 
     def close(self) -> None:
         if self._model is None:
@@ -132,7 +133,7 @@ if __name__ == "__main__":
         with YOLO_World_Manager(confidence=0.45) as manager:
             print("manager")
             result = manager.predict("./image.png",["cat"])
-            print(result.boxes)
+            print(result[0].boxes)
         # manager = YOLO_World_Manager(confidence=0.45)
         # manager.load()
     except (ValueError,RuntimeError) as e:
