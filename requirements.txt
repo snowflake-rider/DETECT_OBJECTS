@@ -19,4 +19,4 @@ soundfile==0.13.1
 # Offline voice notification
 pyttsx3==2.99
 
-yobjc-framework-AVFoundation=12.2.1
+pyobjc-framework-AVFoundation
