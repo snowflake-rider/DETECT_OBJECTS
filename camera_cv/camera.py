@@ -30,7 +30,7 @@ class Camera_Manager:
     def start_record(self):
         
         if self.__manager_obj is None or not self.__manager_obj.isOpened():
-            self.gc_resource()
+            self._gc_resource()
             raise RuntimeError("camera unavilable!")
         try:
             yolo_manager= YOLO_World_Manager(confidence=0.35)
