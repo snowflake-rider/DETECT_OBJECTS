@@ -1,3 +1,9 @@
+"""Probe OpenCV camera indexes and report which devices can return frames.
+
+This is the portable camera-discovery CLI.  Backend selection is based on the
+host operating system, while the index range and retry count are configurable.
+"""
+
 import argparse
 import platform
 import time
@@ -6,6 +12,7 @@ import cv2
 
 
 def get_backend() -> int:
+    """Return the OpenCV capture backend best suited to the current OS."""
     backend_by_os = {
         "Darwin": cv2.CAP_AVFOUNDATION,
         "Linux": cv2.CAP_V4L2,
@@ -15,6 +22,7 @@ def get_backend() -> int:
 
 
 def read_frame(camera: cv2.VideoCapture, attempts: int) -> object | None:
+    """Read a frame, retrying briefly while a camera finishes warming up."""
     for _ in range(attempts):
         success, frame = camera.read()
 
@@ -27,6 +35,7 @@ def read_frame(camera: cv2.VideoCapture, attempts: int) -> object | None:
 
 
 def find_cameras(max_index: int, attempts: int) -> list[int]:
+    """Return camera indexes that open successfully and produce a frame."""
     backend = get_backend()
     available_indexes = []
 
@@ -61,6 +70,7 @@ def find_cameras(max_index: int, attempts: int) -> list[int]:
 
 
 def main() -> None:
+    """Parse CLI options, scan camera indexes, and print a summary."""
     parser = argparse.ArgumentParser(
         description="사용 가능한 OpenCV 카메라 인덱스를 찾습니다."
     )
