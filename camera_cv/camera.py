@@ -1,3 +1,11 @@
+"""Run real-time YOLO-World object detection on a local camera stream.
+
+The camera manager opens the camera index supplied on the command line,
+captures frames through OpenCV, and draws YOLO-World predictions until the
+user presses ``q``.
+"""
+
+import argparse
 import cv2
 import platform
 import sys
@@ -7,23 +15,30 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT))
 
 from models.yolo_world_module import YOLO_World_Manager
-from AVFoundation import AVCaptureDevice, AVMediaTypeVideo
 
 
 class Camera_Manager:
-    def __init__(self):
+    """Coordinate camera capture, inference, and resource cleanup."""
+
+    def __init__(self, camera_index):
+        """Open the requested camera and configure detectable classes."""
+        # Camera indexes depend on the computer and its connected devices, so
+        # the caller chooses the index instead of this class hard-coding it.
+        self.__camera_index = camera_index
         self.__backend = self._select_backend()
-        self.__available = self._find_cameras()
-        if len(self.__available):
-            self.__manager_obj = cv2.VideoCapture(1, self.__backend)
-            self.__classes = [
-                "smartphone",
-                "wristwatch",
-                "keyboard",
-                "person",
-            ]
+        self.__manager_obj = cv2.VideoCapture(
+            self.__camera_index,
+            self.__backend,
+        )
+        self.__classes = [
+            "smartphone",
+            "wristwatch",
+            "keyboard",
+            "person",
+        ]
 
     def _select_backend(self) -> int:
+        """Choose the native OpenCV video backend for the current OS."""
         os_name = platform.system()
         print(f"os name : {os_name}")
         backend_map = {
@@ -33,49 +48,11 @@ class Camera_Manager:
         }
         return backend_map.get(os_name, cv2.CAP_ANY)
 
-    def _find_cameras(self, max_index=10):
-        backend = self._select_backend()
-
-        available = []
-
-        if platform.system() == "Darwin":
-            devices = AVCaptureDevice.devicesWithMediaType_(AVMediaTypeVideo)
-
-            for index, device in enumerate(devices):
-                name = device.localizedName()
-                print(f"{index}: {device}")
-                print(f"name:{name.lower()}")
-                # iPhone 카메라는 제외
-                if "iphone" not in name.lower():
-                    print(index)
-                    available.append(index)
-                    break
-
-        else:
-            for index in range(max_index):
-                cap = cv2.VideoCapture(index, backend)
-                if cap.isOpened():
-                    ret, frame = cap.read()
-
-                    if ret and frame is not None:
-                        h, w = frame.shape[:2]
-                        print(f"[O] Camera {index} ({w}x{h})")
-                        available.append(index)
-                    else:
-                        print(f"[△] Camera {index} opened, but cannot read frame")
-
-                cap.release()
-
-        return available
-
     def start_record(self):
-        if (
-            self.__manager_obj is None
-            or not self.__manager_obj.isOpened()
-            or len(self.__available) <= 0
-        ):
+        """Start the detection preview and run until ``q`` or a read failure."""
+        if not self.__manager_obj.isOpened():
             self._gc_resource()
-            raise RuntimeError("camera unavilable!")
+            raise RuntimeError(f"camera index {self.__camera_index} is unavailable!")
         try:
             yolo_manager = YOLO_World_Manager(confidence=0.35)
             yolo_manager.load()
@@ -92,6 +69,8 @@ class Camera_Manager:
             frame_height, frame_width = frame.shape[:2]
             boxes, names = yolo_manager.predict(frame=frame)
 
+            # YOLO returns normalized coordinates; OpenCV drawing functions
+            # require integer pixel coordinates in the current frame.
             for box in boxes:
                 x1, y1, x2, y2 = box.xyxyn[0].tolist()
                 x1 = int(x1 * frame_width)
@@ -127,14 +106,31 @@ class Camera_Manager:
         self._gc_resource()
 
     def _gc_resource(self):
+        """Release the capture device and close all OpenCV preview windows."""
         if self.__manager_obj is not None:
             self.__manager_obj.release()
         cv2.destroyAllWindows()
 
 
+def parse_args():
+    """Read the machine-specific camera index from the command line."""
+    parser = argparse.ArgumentParser(
+        description="Run object detection with a selected camera.",
+    )
+    parser.add_argument(
+        "--camera-index",
+        type=int,
+        required=True,
+        help="OpenCV camera index to open, such as 0 or 1.",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
+    args = parse_args()
+
     try:
-        camera_manager = Camera_Manager()
+        camera_manager = Camera_Manager(args.camera_index)
         camera_manager.start_record()
     except RuntimeError as e:
         print(e)
