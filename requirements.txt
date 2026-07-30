@@ -19,4 +19,7 @@ soundfile==0.13.1
 # Offline voice notification
 pyttsx3==2.99
 
+# Formatter
+black==26.5.1
+
 pyobjc-framework-AVFoundation

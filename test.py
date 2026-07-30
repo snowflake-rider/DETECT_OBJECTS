@@ -1,5 +1,12 @@
+"""Legacy smoke test that probes macOS camera indexes through AVFoundation.
+
+This file is an executable diagnostic script rather than an automated test.
+Prefer ``camera_cv/list_cameras.py`` for the maintained cross-platform CLI.
+"""
+
 import cv2
 
+# AVFoundation is explicitly selected because this legacy script targets macOS.
 backend = cv2.CAP_AVFOUNDATION
 
 for index in range(10):

@@ -60,8 +60,7 @@ def find_cameras(max_index: int, attempts: int) -> list[int]:
             available_indexes.append(index)
 
             print(
-                f"[{index}] available "
-                f"({width}x{height}, reported FPS: {fps:.1f})"
+                f"[{index}] available " f"({width}x{height}, reported FPS: {fps:.1f})"
             )
         finally:
             camera.release()
