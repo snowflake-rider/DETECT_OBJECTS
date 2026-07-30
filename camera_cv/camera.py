@@ -52,9 +52,7 @@ class Camera_Manager:
         """Start the detection preview and run until ``q`` or a read failure."""
         if not self.__manager_obj.isOpened():
             self._gc_resource()
-            raise RuntimeError(
-                f"camera index {self.__camera_index} is unavailable!"
-            )
+            raise RuntimeError(f"camera index {self.__camera_index} is unavailable!")
         try:
             yolo_manager = YOLO_World_Manager(confidence=0.35)
             yolo_manager.load()
