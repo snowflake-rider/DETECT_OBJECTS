@@ -1,4 +1,4 @@
-# yolo_world_manager.py
+"""Manage YOLO-World model loading, custom classes, prediction, and cleanup."""
 
 from __future__ import annotations
 
@@ -14,13 +14,17 @@ from ultralytics.engine.results import Boxes
 from models.device_selector import DeviceInfo, DeviceSelector
 from typing import Self
 
+
 class YOLO_World_Manager:
+    """Own a YOLO-World model and expose its inference lifecycle."""
+
     def __init__(
         self,
         model_path: str | Path = "yolov8s-worldv2.pt",
         confidence: float = 0.25,
-        image_size: np.array = [640,640],
+        image_size: np.array = [640, 640],
     ) -> None:
+        """Configure model location, confidence threshold, image size, and device."""
         self._model_path = Path(model_path)
         print(f"model path:{model_path}\n")
         self._confidence = confidence
@@ -31,34 +35,36 @@ class YOLO_World_Manager:
 
     @property
     def is_loaded(self) -> bool:
-        return (self._model is not None)  and (isinstance(self._model,YOLOWorld))
+        """Return whether a YOLO-World model instance is currently loaded."""
+        return (self._model is not None) and (isinstance(self._model, YOLOWorld))
 
     @property
     def device(self) -> str:
+        """Return the selected PyTorch device identifier."""
         return self._device_info.device
 
     @property
     def device_name(self) -> str:
+        """Return a human-readable name for the selected inference device."""
         return self._device_info.name
 
     def load(self) -> None:
+        """Load model weights unless the model has already been initialized."""
         if self.is_loaded:
             print("model loaded already")
-            return 
+            return
 
         print(f"YOLO-World 모델 로딩: {self._model_path}")
-        print(
-            f"추론 장치: "
-            f"{self._device_info.device} "
-            f"({self._device_info.name})"
-        )
+        print(f"추론 장치: {self._device_info.device} ({self._device_info.name})")
         self._model = YOLOWorld(str(self._model_path))
 
-    def set_classes(self,classes:Sequence[str])->None:
+    def set_classes(self, classes: Sequence[str]) -> None:
+        """Normalize and apply the object classes the model should detect."""
         self.__classes = self._normalize_classes(classes)
         self._model.set_classes(self.__classes)
 
-    def predict(self, frame: np.ndarray|str) -> tuple[Boxes, dict[int, str]]:
+    def predict(self, frame: np.ndarray | str) -> tuple[Boxes, dict[int, str]]:
+        """Run inference on an image or frame and return CPU boxes and names."""
         model = self._require_model()
         results = model.predict(
             source=frame,
@@ -68,9 +74,10 @@ class YOLO_World_Manager:
             verbose=False,
         )[0]
 
-        return results.boxes.cpu(),results.names
+        return results.boxes.cpu(), results.names
 
     def close(self) -> None:
+        """Drop the model and clear accelerator caches when available."""
         if self._model is None:
             return
 
@@ -91,6 +98,7 @@ class YOLO_World_Manager:
         print("YOLO-World 모델 자원을 해제했습니다.")
 
     def __enter__(self) -> Self:
+        """Load the model when entering a context-manager block."""
         print("loading weight file\n")
         self.load()
         return self
@@ -101,19 +109,21 @@ class YOLO_World_Manager:
         exc_value,
         traceback,
     ) -> None:
+        """Release model resources when leaving a context-manager block."""
         self.close()
 
     def _require_model(self) -> YOLOWorld:
+        """Return the loaded model or raise a lifecycle usage error."""
         if not self.is_loaded:
             raise RuntimeError(
-                "YOLO-World 모델이 로딩되지 않았습니다. "
-                "먼저 load()를 호출하세요."
+                "YOLO-World 모델이 로딩되지 않았습니다. 먼저 load()를 호출하세요."
             )
 
         return self._model
 
     @staticmethod
     def _normalize_classes(classes: Sequence[str]) -> list[str]:
+        """Trim class names, remove duplicates, and reject an empty class list."""
         normalized = []
 
         for class_name in classes:
@@ -132,9 +142,9 @@ if __name__ == "__main__":
     try:
         with YOLO_World_Manager(confidence=0.45) as manager:
             print("manager")
-            result = manager.predict("./image.png",["cat"])
+            result = manager.predict("./image.png", ["cat"])
             print(result[0].boxes)
         # manager = YOLO_World_Manager(confidence=0.45)
         # manager.load()
-    except (ValueError,RuntimeError) as e:
+    except (ValueError, RuntimeError) as e:
         print(e)

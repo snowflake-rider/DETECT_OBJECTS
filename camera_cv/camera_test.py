@@ -1,3 +1,9 @@
+"""Display a raw camera preview to verify capture without loading a model.
+
+Press ``q`` or Escape to close the preview.  Temporary read failures are
+retried because some camera devices need time to begin delivering frames.
+"""
+
 import platform
 import time
 
@@ -5,6 +11,7 @@ import cv2
 
 
 def get_camera_backend() -> int:
+    """Use AVFoundation on macOS and OpenCV's automatic backend elsewhere."""
     if platform.system() == "Darwin":
         return cv2.CAP_AVFOUNDATION
 
@@ -12,6 +19,7 @@ def get_camera_backend() -> int:
 
 
 def main() -> None:
+    """Open camera index 0 and display frames until the user exits."""
     camera = cv2.VideoCapture(0, get_camera_backend())
 
     if not camera.isOpened():
