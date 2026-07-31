@@ -1,0 +1,322 @@
+{
+    "사람": {
+        "class_name": "person",
+        "class_id": 0
+    },
+    "자전거": {
+        "class_name": "bicycle",
+        "class_id": 1
+    },
+    "자동차": {
+        "class_name": "car",
+        "class_id": 2
+    },
+    "오토바이": {
+        "class_name": "motorcycle",
+        "class_id": 3
+    },
+    "비행기": {
+        "class_name": "airplane",
+        "class_id": 4
+    },
+    "버스": {
+        "class_name": "bus",
+        "class_id": 5
+    },
+    "기차": {
+        "class_name": "train",
+        "class_id": 6
+    },
+    "트럭": {
+        "class_name": "truck",
+        "class_id": 7
+    },
+    "보트": {
+        "class_name": "boat",
+        "class_id": 8
+    },
+    "신호등": {
+        "class_name": "traffic light",
+        "class_id": 9
+    },
+    "소화전": {
+        "class_name": "fire hydrant",
+        "class_id": 10
+    },
+    "정지표지판": {
+        "class_name": "stop sign",
+        "class_id": 11
+    },
+    "주차요금기": {
+        "class_name": "parking meter",
+        "class_id": 12
+    },
+    "벤치": {
+        "class_name": "bench",
+        "class_id": 13
+    },
+    "새": {
+        "class_name": "bird",
+        "class_id": 14
+    },
+    "고양이": {
+        "class_name": "cat",
+        "class_id": 15
+    },
+    "개": {
+        "class_name": "dog",
+        "class_id": 16
+    },
+    "말": {
+        "class_name": "horse",
+        "class_id": 17
+    },
+    "양": {
+        "class_name": "sheep",
+        "class_id": 18
+    },
+    "소": {
+        "class_name": "cow",
+        "class_id": 19
+    },
+    "코끼리": {
+        "class_name": "elephant",
+        "class_id": 20
+    },
+    "곰": {
+        "class_name": "bear",
+        "class_id": 21
+    },
+    "얼룩말": {
+        "class_name": "zebra",
+        "class_id": 22
+    },
+    "기린": {
+        "class_name": "giraffe",
+        "class_id": 23
+    },
+    "백팩": {
+        "class_name": "backpack",
+        "class_id": 24
+    },
+    "우산": {
+        "class_name": "umbrella",
+        "class_id": 25
+    },
+    "핸드백": {
+        "class_name": "handbag",
+        "class_id": 26
+    },
+    "넥타이": {
+        "class_name": "tie",
+        "class_id": 27
+    },
+    "여행가방": {
+        "class_name": "suitcase",
+        "class_id": 28
+    },
+    "프리스비": {
+        "class_name": "frisbee",
+        "class_id": 29
+    },
+    "스키": {
+        "class_name": "skis",
+        "class_id": 30
+    },
+    "스노보드": {
+        "class_name": "snowboard",
+        "class_id": 31
+    },
+    "공": {
+        "class_name": "sports ball",
+        "class_id": 32
+    },
+    "연": {
+        "class_name": "kite",
+        "class_id": 33
+    },
+    "야구방망이": {
+        "class_name": "baseball bat",
+        "class_id": 34
+    },
+    "야구글러브": {
+        "class_name": "baseball glove",
+        "class_id": 35
+    },
+    "스케이트보드": {
+        "class_name": "skateboard",
+        "class_id": 36
+    },
+    "서핑보드": {
+        "class_name": "surfboard",
+        "class_id": 37
+    },
+    "테니스라켓": {
+        "class_name": "tennis racket",
+        "class_id": 38
+    },
+    "물병": {
+        "class_name": "bottle",
+        "class_id": 39
+    },
+    "와인잔": {
+        "class_name": "wine glass",
+        "class_id": 40
+    },
+    "컵": {
+        "class_name": "cup",
+        "class_id": 41
+    },
+    "포크": {
+        "class_name": "fork",
+        "class_id": 42
+    },
+    "칼": {
+        "class_name": "knife",
+        "class_id": 43
+    },
+    "숟가락": {
+        "class_name": "spoon",
+        "class_id": 44
+    },
+    "그릇": {
+        "class_name": "bowl",
+        "class_id": 45
+    },
+    "바나나": {
+        "class_name": "banana",
+        "class_id": 46
+    },
+    "사과": {
+        "class_name": "apple",
+        "class_id": 47
+    },
+    "샌드위치": {
+        "class_name": "sandwich",
+        "class_id": 48
+    },
+    "오렌지": {
+        "class_name": "orange",
+        "class_id": 49
+    },
+    "브로콜리": {
+        "class_name": "broccoli",
+        "class_id": 50
+    },
+    "당근": {
+        "class_name": "carrot",
+        "class_id": 51
+    },
+    "핫도그": {
+        "class_name": "hot dog",
+        "class_id": 52
+    },
+    "피자": {
+        "class_name": "pizza",
+        "class_id": 53
+    },
+    "도넛": {
+        "class_name": "donut",
+        "class_id": 54
+    },
+    "케이크": {
+        "class_name": "cake",
+        "class_id": 55
+    },
+    "의자": {
+        "class_name": "chair",
+        "class_id": 56
+    },
+    "소파": {
+        "class_name": "couch",
+        "class_id": 57
+    },
+    "화분": {
+        "class_name": "potted plant",
+        "class_id": 58
+    },
+    "침대": {
+        "class_name": "bed",
+        "class_id": 59
+    },
+    "식탁": {
+        "class_name": "dining table",
+        "class_id": 60
+    },
+    "변기": {
+        "class_name": "toilet",
+        "class_id": 61
+    },
+    "텔레비전": {
+        "class_name": "tv",
+        "class_id": 62
+    },
+    "노트북": {
+        "class_name": "laptop",
+        "class_id": 63
+    },
+    "마우스": {
+        "class_name": "mouse",
+        "class_id": 64
+    },
+    "리모컨": {
+        "class_name": "remote",
+        "class_id": 65
+    },
+    "키보드": {
+        "class_name": "keyboard",
+        "class_id": 66
+    },
+    "휴대폰": {
+        "class_name": "cell phone",
+        "class_id": 67
+    },
+    "전자레인지": {
+        "class_name": "microwave",
+        "class_id": 68
+    },
+    "오븐": {
+        "class_name": "oven",
+        "class_id": 69
+    },
+    "토스터": {
+        "class_name": "toaster",
+        "class_id": 70
+    },
+    "싱크대": {
+        "class_name": "sink",
+        "class_id": 71
+    },
+    "냉장고": {
+        "class_name": "refrigerator",
+        "class_id": 72
+    },
+    "책": {
+        "class_name": "book",
+        "class_id": 73
+    },
+    "시계": {
+        "class_name": "clock",
+        "class_id": 74
+    },
+    "꽃병": {
+        "class_name": "vase",
+        "class_id": 75
+    },
+    "가위": {
+        "class_name": "scissors",
+        "class_id": 76
+    },
+    "곰인형": {
+        "class_name": "teddy bear",
+        "class_id": 77
+    },
+    "헤어드라이어": {
+        "class_name": "hair drier",
+        "class_id": 78
+    },
+    "칫솔": {
+        "class_name": "toothbrush",
+        "class_id": 79
+    }
+}
