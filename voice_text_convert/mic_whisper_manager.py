@@ -2,8 +2,7 @@ import numpy as np
 import sounddevice as sd
 import whisper
 import queue
-import platform 
-from typing import Self
+from parse_and_match_module import Text_Manager
 import threading
 
 SAMPLE_RATE = 16000
@@ -35,7 +34,7 @@ class Whisper_Audio_Manager:
             record_seconds=RECORD_SECONDS,
             is_use_stream=False,
             block_size=BLOCK_SIZE,
-            language='kr',
+            language='ko',
             dtype="float32"
         ):
         self.__device_id = device_id
@@ -51,7 +50,9 @@ class Whisper_Audio_Manager:
 
         self.__stream:sd.InputStream | None = None
         self.__is_running = False
-        self.__audio_queue : queue.Queue[np.ndarray] = queue.Queue(maxsize=5)
+        self.__audio_queue : queue.Queue[np.ndarray] = queue.Queue(
+            maxsize=MAX_AUDIO_QUEUE_SIZE
+        )
 
         self.__result_queue:queue.Queue[str] = queue.Queue(
             maxsize=MAX_RESULT_QUEUE_SIZE
@@ -113,7 +114,7 @@ class Whisper_Audio_Manager:
             )
             if self.__channels>device_info["max_input_channels"]:
                 raise ValueError(
-                    f"요청한 채널 수는 {self._channels}개이지만, "
+                    f"요청한 채널 수는 {self.__channels}개이지만, "
                     f"장치가 지원하는 최대 입력 채널 수는 "
                     f"{device_info['max_input_channels']}개입니다."
                 )
@@ -239,8 +240,11 @@ class Whisper_Audio_Manager:
             except queue.Empty:
                 continue
 
-        collected_blocks.append(block)
-        collected_samples += block.shape[0]
+            collected_blocks.append(block)
+            collected_samples += block.shape[0]
+
+        if not collected_blocks:
+            return None
 
         audio = np.concatenate(
             collected_blocks,
@@ -276,11 +280,11 @@ class Whisper_Audio_Manager:
             np.float32,
             copy=False,
         )
-        is_fp16 = "Darwin" in platform.system().lower()
         result = self.__whisper_model.transcribe(
             audio=audio,
             language=self.__language,
-            fp16 = False
+            task="transcribe",
+            fp16=False
         )
         return result["text"].strip()
     # ---------------------------------------
@@ -401,9 +405,7 @@ def main() -> None:
         )
 
         for device in devices:
-            print(
-                print(f"{device}")
-            )
+            print(device)
 
         device_id = int(
             input("마이크 device id를 입력하세요: ")
@@ -423,16 +425,28 @@ def main() -> None:
 
         print("음성 인식을 시작합니다.")
         print("종료하려면 Ctrl+C를 누르세요.")
-
-        while True:
-            text = manager.get_transcribed_text(
-                timeout=0.5
-            )
-
-            if text is not None:
-                print(
-                    f"인식 결과: {text}"
+        with Text_Manager() as text_manager:
+            while True:
+                text = manager.get_transcribed_text(
+                    timeout=0.5
                 )
+
+                if text is not None:
+                    print("\n========== 음성 인식 결과 ==========")
+                    print(f"텍스트: {text}")
+
+                    detected_classes = text_manager.extract(text)
+                    if not detected_classes:
+                        print("YOLO 클래스: 일치하는 클래스가 없습니다.")
+                        continue
+
+                    print("========== YOLO 클래스 ==========")
+                    for detected in detected_classes:
+                        print(
+                            f"한국어={detected.korean_word}, "
+                            f"class_name={detected.yolo_class}, "
+                            f"class_id={detected.index}"
+                        )
 
     except KeyboardInterrupt:
         print("\n사용자가 프로그램을 종료했습니다.")
@@ -447,4 +461,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

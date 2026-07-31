@@ -56,15 +56,27 @@ class Text_Manager:
         normalized_text = self._normalize(text)
         if (self.__dictionary) is None or len(self.__dictionary)==0 or not isinstance(self.__dictionary,dict):
             raise ValueError("invalid dictionary")
-        found_yolo_classes:set[str] = set()
-        detected_classes = []
+        found_yolo_classes: set[str] = set()
+        detected_classes: list[DetectedClass] = []
         for key,data in self.__dictionary_list:
-            class_name,class_id = data.items()
-            if key not in normalized_text:
+            normalized_key = self._normalize(key)
+            if normalized_key not in normalized_text:
                 continue
+            class_name = data.get("class_name")
+            class_id = data.get("class_id")
+            if not isinstance(class_name, str) or not isinstance(class_id, int):
+                raise ValueError(
+                    f"잘못된 클래스 데이터입니다: {key}={data}"
+                )
             if class_name in found_yolo_classes:
                 continue
-            detected_classes.append(DetectedClass(korean_word=key,yolo_class=class_name,index=class_id))
+            detected_classes.append(
+                DetectedClass(
+                    korean_word=key,
+                    yolo_class=class_name,
+                    index=class_id,
+                )
+            )
             found_yolo_classes.add(class_name)
         
         return detected_classes
