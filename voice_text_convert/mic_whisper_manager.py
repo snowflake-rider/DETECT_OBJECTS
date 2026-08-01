@@ -2,7 +2,15 @@ import numpy as np
 import sounddevice as sd
 import whisper
 import queue
-from parse_and_match_module import Text_Manager
+import math
+import traceback
+
+try:
+    # Imported from the project root, e.g. `python main.py`.
+    from .parse_and_match_module import Text_Manager
+except ImportError:
+    # Also allow direct execution: `python voice_text_convert/mic_whisper_manager.py`.
+    from parse_and_match_module import Text_Manager
 import threading
 
 SAMPLE_RATE = 16000
@@ -50,8 +58,14 @@ class Whisper_Audio_Manager:
 
         self.__stream:sd.InputStream | None = None
         self.__is_running = False
+        # Keep enough audio while Whisper is transcribing the previous segment.
+        blocks_per_recording = math.ceil(
+            self.__sample_rate
+            * self.__record_seconds
+            / self.__block_size
+        )
         self.__audio_queue : queue.Queue[np.ndarray] = queue.Queue(
-            maxsize=MAX_AUDIO_QUEUE_SIZE
+            maxsize=max(MAX_AUDIO_QUEUE_SIZE, blocks_per_recording * 2)
         )
 
         self.__result_queue:queue.Queue[str] = queue.Queue(
@@ -149,6 +163,11 @@ class Whisper_Audio_Manager:
         self.validate_input_device(self.__device_id)
         device_info = self.get_input_device_info(self.__device_id)
         self.__device_id = self.__device_id
+        print(
+            f"선택한 마이크: id={self.__device_id}, "
+            f"name={device_info['name']}, "
+            f"sample_rate={self.__sample_rate}"
+        )
         return device_info
 
     # create stream
@@ -157,7 +176,7 @@ class Whisper_Audio_Manager:
             raise RuntimeError("입력 장치가 선택되지 않았습니다")
         if self.__stream is not None:
             raise RuntimeError("입력 스트림이 이미 생성되어 있습니다")
-        self.validate_input_device(self.__device_id)
+        device_info = self.select_input_device()
         self.__stream = sd.InputStream(
             device=self.__device_id,
             samplerate=self.__sample_rate,
@@ -166,6 +185,7 @@ class Whisper_Audio_Manager:
             blocksize=self.__block_size,
             callback=self._audio_callback
         )
+        print(f"마이크 스트림 생성 완료: {device_info['name']}")
 
     # start stream
     def start_stream(self)->None:
@@ -297,9 +317,17 @@ class Whisper_Audio_Manager:
                 audio = self.collect_audio()
                 if audio is None:
                     break
+                rms = float(np.sqrt(np.mean(np.square(audio))))
+                peak = float(np.max(np.abs(audio)))
+                print(
+                    f"오디오 수집 완료: {len(audio) / self.__sample_rate:.1f}초, "
+                    f"RMS={rms:.6f}, peak={peak:.6f}"
+                )
                 text = self.transcribe_audio(audio)
                 if not text:
+                    print("Whisper 결과가 비어 있습니다.")
                     continue
+                print(f"Whisper 인식 결과: {text}")
                 self._put_latest_result(text)
             except Exception as error:
                 if self.__stop_event.is_set():
@@ -307,6 +335,7 @@ class Whisper_Audio_Manager:
                 print(
                     f"Audio worker 오류: {error}"
                 )
+                traceback.print_exc()
         print("Audio worker 를 종료했습니다")
 
     def _put_latest_result(
@@ -331,12 +360,15 @@ class Whisper_Audio_Manager:
             and self.__worker_thread.is_alive() 
         ):
             return
-        self.load_model()
+        if self.__whisper_model is None:
+            self.load_model()
         self.__stop_event.clear()
         self.__worker_thread = threading.Thread(
             target=self._worker,
             name="WhisperAudioWorker",
-            daemon=False
+            # Whisper 추론 자체가 외부 라이브러리 안에서 지연되더라도
+            # 애플리케이션 종료를 영구적으로 막지 않도록 한다.
+            daemon=True
         )
         self.__worker_thread.start()
 
@@ -385,8 +417,9 @@ class Whisper_Audio_Manager:
         self.start_worker()
 
     def close(self)->None:
-        self.stop_worker()
+        # 새 오디오 유입을 먼저 중단하고 worker의 대기를 해제한다.
         self.stop_stream()
+        self.stop_worker()
         self.close_stream()
         self._clear_queue(
             self.__audio_queue
