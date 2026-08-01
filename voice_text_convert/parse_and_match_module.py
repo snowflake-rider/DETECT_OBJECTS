@@ -50,6 +50,20 @@ class Text_Manager:
     def __exit__(self, exc_type, exc, tb):
         pass
 
+    def get_supported_yolo_classes(self) -> list[str]:
+        """Return unique YOLO class names available to the text parser."""
+        if not isinstance(self.__dictionary, dict) or not self.__dictionary:
+            raise RuntimeError("클래스 사전이 로드되지 않았습니다")
+
+        return list(
+            dict.fromkeys(
+                data["class_name"]
+                for data in self.__dictionary.values()
+                if isinstance(data, dict)
+                and isinstance(data.get("class_name"), str)
+            )
+        )
+
     def extract(self,text:str)->list:
         print("extract\n")
         print(f"text : {text}")
