@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 import threading
 import queue
+import time
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT))
@@ -26,9 +27,8 @@ class Camera_Manager:
             self,
             camera_index,
             thread_event:threading.Event=None,
-            ready_model_queue: queue.Queue[
-                tuple[YOLO_World_Manager, list[str]]
-            ] | None = None,
+            class_names_queue: queue.Queue[tuple[list[str], float]] | None = None,
+            supported_classes: list[str] | None = None,
         ):
         """Open the requested camera and configure detectable classes."""
         # Camera indexes depend on the computer and its connected devices, so
@@ -40,14 +40,15 @@ class Camera_Manager:
             self.__backend,
         )
         self.__classes = [
-            "smartphone",
-            "wristwatch",
+            "cell phone",
+            "clock",
             "keyboard",
             "person",
         ]
+        self.__supported_classes = supported_classes or self.__classes
         self.__thread_event = thread_event or threading.Event()
         self.__yolo_world_manager:YOLO_World_Manager = None 
-        self.__ready_model_queue = ready_model_queue
+        self.__class_names_queue = class_names_queue
     def _select_backend(self) -> int:
         """Choose the native OpenCV video backend for the current OS."""
         os_name = platform.system()
@@ -65,32 +66,42 @@ class Camera_Manager:
         try:
             self.__yolo_world_manager = YOLO_World_Manager(confidence=0.65)
             self.__yolo_world_manager.load()
-            self.__yolo_world_manager.set_classes(self.__classes)
+            self.__yolo_world_manager.cache_class_embeddings(
+                self.__supported_classes
+            )
+            self.__yolo_world_manager.activate_cached_classes(self.__classes)
         except Exception as e:
             print(e)
             self._gc_resource()
             raise RuntimeError("error occured while loading YOLO World Module\n")
 
-    def _apply_ready_model(self) -> None:
-        """Swap a fully prepared model between two frame inferences."""
-        if self.__ready_model_queue is None:
+    def _apply_latest_classes(self) -> None:
+        """Apply the newest class request by swapping cached embeddings."""
+        if self.__class_names_queue is None:
             return
 
-        try:
-            new_manager, new_classes = self.__ready_model_queue.get_nowait()
-        except queue.Empty:
+        latest_request = None
+        while True:
+            try:
+                latest_request = self.__class_names_queue.get_nowait()
+            except queue.Empty:
+                break
+
+        if latest_request is None:
             return
 
-        old_manager = self.__yolo_world_manager
-        self.__yolo_world_manager = new_manager
+        new_classes, requested_at = latest_request
+        self.__yolo_world_manager.activate_cached_classes(new_classes)
         self.__classes = new_classes
         print(
-            f"YOLO 모델 교체 완료: classes={self.__classes}, "
-            f"device={new_manager.device}"
+            f"클래스 임베딩 변경 완료: classes={self.__classes}, "
+            f"device={self.__yolo_world_manager.device}"
         )
-
-        if old_manager is not None:
-            old_manager.close()
+        elapsed_seconds = time.perf_counter() - requested_at
+        print(
+            f"[성능] 클래스 임베딩 변경 완료: {elapsed_seconds * 1000:.2f} ms "
+            f"(classes={new_classes})"
+        )
     # process start, end logic
     def start_record(self):
         """Start the detection preview and run until ``q`` or a read failure."""
@@ -103,9 +114,8 @@ class Camera_Manager:
             if not is_success:
                 print("cannot read frame")
                 break
-            # The camera thread owns both predict and swap, so an active model
-            # can never be closed in the middle of an inference.
-            self._apply_ready_model()
+            # Apply embeddings between frames, never during predict().
+            self._apply_latest_classes()
             frame_height, frame_width = frame.shape[:2]
             boxes, names = self.__yolo_world_manager.predict(frame=frame)
             # YOLO returns normalized coordinates; OpenCV drawing functions

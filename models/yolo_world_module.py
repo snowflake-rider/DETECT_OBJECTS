@@ -31,6 +31,7 @@ class YOLO_World_Manager:
         self._image_size = image_size
         self._device_info: DeviceInfo = DeviceSelector.select()
         self._model: YOLOWorld | None = None
+        self._class_embedding_cache: dict[str, torch.Tensor] = {}
         print("manager initialized..\n")
 
     @property
@@ -62,6 +63,74 @@ class YOLO_World_Manager:
         """Normalize and apply the object classes the model should detect."""
         self.__classes = self._normalize_classes(classes)
         self._model.set_classes(self.__classes)
+
+    def cache_class_embeddings(self, classes: Sequence[str]) -> None:
+        """Create class embeddings once and retain CPU copies for fast reuse."""
+        model = self._require_model()
+        normalized_classes = self._normalize_classes(classes)
+        world_model = model.model
+        stored_names = (
+            list(world_model.names.values())
+            if isinstance(world_model.names, dict)
+            else list(world_model.names)
+        )
+        stored_features = world_model.txt_feats.detach().cpu()
+        stored_indexes = {
+            class_name: index
+            for index, class_name in enumerate(stored_names)
+        }
+        missing_classes = [
+            name for name in normalized_classes if name not in stored_indexes
+        ]
+
+        # yolov8s-worldv2.pt already contains COCO embeddings. Reuse them so
+        # the runtime swap does not need CLIP or another set_classes() call.
+        if missing_classes:
+            model.set_classes(normalized_classes)
+            stored_features = model.model.txt_feats.detach().cpu()
+            stored_indexes = {
+                class_name: index
+                for index, class_name in enumerate(normalized_classes)
+            }
+
+        if stored_features.shape[1] < len(stored_indexes):
+            raise RuntimeError(
+                "클래스 개수와 텍스트 임베딩 개수가 일치하지 않습니다"
+            )
+
+        self._class_embedding_cache = {
+            class_name: stored_features[
+                :, stored_indexes[class_name]:stored_indexes[class_name] + 1, :
+            ].clone()
+            for class_name in normalized_classes
+        }
+        self.__classes = normalized_classes
+        print(f"클래스 임베딩 캐시 완료: {len(self._class_embedding_cache)}개")
+
+    def activate_cached_classes(self, classes: Sequence[str]) -> None:
+        """Change detection classes by replacing only cached text embeddings."""
+        model = self._require_model()
+        normalized_classes = self._normalize_classes(classes)
+        missing_classes = [
+            name
+            for name in normalized_classes
+            if name not in self._class_embedding_cache
+        ]
+        if missing_classes:
+            raise ValueError(f"캐시에 없는 클래스입니다: {missing_classes}")
+
+        world_model = model.model
+        world_model.txt_feats = torch.cat(
+            [self._class_embedding_cache[name] for name in normalized_classes],
+            dim=1,
+        )
+        world_model.model[-1].nc = len(normalized_classes)
+        world_model.names = normalized_classes
+
+        if model.predictor is not None:
+            model.predictor.model.names = normalized_classes
+
+        self.__classes = normalized_classes
 
     def predict(self, frame: np.ndarray | str) -> tuple[Boxes, dict[int, str]]:
         """Run inference on an image or frame and return CPU boxes and names."""
