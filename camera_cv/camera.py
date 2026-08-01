@@ -22,7 +22,14 @@ from models.yolo_world_module import YOLO_World_Manager
 class Camera_Manager:
     """Coordinate camera capture, inference, and resource cleanup."""
 
-    def __init__(self, camera_index,thread_event:threading.Event=None):
+    def __init__(
+            self,
+            camera_index,
+            thread_event:threading.Event=None,
+            ready_model_queue: queue.Queue[
+                tuple[YOLO_World_Manager, list[str]]
+            ] | None = None,
+        ):
         """Open the requested camera and configure detectable classes."""
         # Camera indexes depend on the computer and its connected devices, so
         # the caller chooses the index instead of this class hard-coding it.
@@ -38,9 +45,9 @@ class Camera_Manager:
             "keyboard",
             "person",
         ]
-        self.__thread_event = thread_event
+        self.__thread_event = thread_event or threading.Event()
         self.__yolo_world_manager:YOLO_World_Manager = None 
-
+        self.__ready_model_queue = ready_model_queue
     def _select_backend(self) -> int:
         """Choose the native OpenCV video backend for the current OS."""
         os_name = platform.system()
@@ -52,9 +59,11 @@ class Camera_Manager:
         }
         return backend_map.get(os_name, cv2.CAP_ANY)
 
+
+    #Yolo world model
     def load_model(self):
         try:
-            self.__yolo_world_manager = YOLO_World_Manager(confidence=0.35)
+            self.__yolo_world_manager = YOLO_World_Manager(confidence=0.65)
             self.__yolo_world_manager.load()
             self.__yolo_world_manager.set_classes(self.__classes)
         except Exception as e:
@@ -62,17 +71,41 @@ class Camera_Manager:
             self._gc_resource()
             raise RuntimeError("error occured while loading YOLO World Module\n")
 
+    def _apply_ready_model(self) -> None:
+        """Swap a fully prepared model between two frame inferences."""
+        if self.__ready_model_queue is None:
+            return
+
+        try:
+            new_manager, new_classes = self.__ready_model_queue.get_nowait()
+        except queue.Empty:
+            return
+
+        old_manager = self.__yolo_world_manager
+        self.__yolo_world_manager = new_manager
+        self.__classes = new_classes
+        print(
+            f"YOLO 모델 교체 완료: classes={self.__classes}, "
+            f"device={new_manager.device}"
+        )
+
+        if old_manager is not None:
+            old_manager.close()
+    # process start, end logic
     def start_record(self):
         """Start the detection preview and run until ``q`` or a read failure."""
         if not self.__manager_obj.isOpened():
             self._gc_resource()
             raise RuntimeError(f"camera index {self.__camera_index} is unavailable!")
                 
-        while True:
+        while not self.__thread_event.is_set():
             is_success, frame = self.__manager_obj.read()
             if not is_success:
                 print("cannot read frame")
                 break
+            # The camera thread owns both predict and swap, so an active model
+            # can never be closed in the middle of an inference.
+            self._apply_ready_model()
             frame_height, frame_width = frame.shape[:2]
             boxes, names = self.__yolo_world_manager.predict(frame=frame)
             # YOLO returns normalized coordinates; OpenCV drawing functions
@@ -108,7 +141,7 @@ class Camera_Manager:
             cv2.imshow("Camera", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
-            
+
         self._gc_resource()
 
     def _gc_resource(self):
@@ -117,12 +150,15 @@ class Camera_Manager:
             self.__manager_obj.release()
         if self.__yolo_world_manager is not None:
             self.__yolo_world_manager.close()
-        if self.__thread_event is not None:
+        if (self.__thread_event is not None) and (self.__thread_event.is_set()==False):
             self.__thread_event.set()
         cv2.destroyAllWindows()
 
     def unload(self):
         self._gc_resource()
+
+
+
 def parse_args():
     """Read the machine-specific camera index from the command line."""
     parser = argparse.ArgumentParser(

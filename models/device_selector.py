@@ -24,7 +24,7 @@ class DeviceSelector:
         if (
             hasattr(torch.backends, "mps")
             and torch.backends.mps.is_built()
-            and torch.backends.mps.is_available
+            and torch.backends.mps.is_available()
         ):
             return DeviceInfo(
                 device="mps", name="Apple Metal Performance Shaders", acclerator=True

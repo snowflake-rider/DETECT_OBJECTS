@@ -66,15 +66,38 @@ class YOLO_World_Manager:
     def predict(self, frame: np.ndarray | str) -> tuple[Boxes, dict[int, str]]:
         """Run inference on an image or frame and return CPU boxes and names."""
         model = self._require_model()
-        results = model.predict(
+        try:
+            results = self._predict(model, frame)
+        except RuntimeError as error:
+            if (
+                self._device_info.device != "mps"
+                or "Placeholder storage has not been allocated" not in str(error)
+            ):
+                raise
+
+            # Some YOLO-World operations/text embeddings are not stable on MPS.
+            # Fall back once to CPU instead of terminating the whole pipeline.
+            print(f"MPS 추론 실패, CPU로 전환합니다: {error}")
+            self._device_info = DeviceInfo(
+                device="cpu",
+                name="CPU (MPS fallback)",
+                acclerator=False,
+            )
+            # Reloading avoids copying an already-invalid MPS placeholder tensor.
+            self._model = YOLOWorld(str(self._model_path))
+            self._model.set_classes(self.__classes)
+            results = self._predict(self._model, frame)
+
+        return results.boxes.cpu(), results.names
+
+    def _predict(self, model: YOLOWorld, frame: np.ndarray | str):
+        return model.predict(
             source=frame,
             device=self._device_info.device,
             conf=self._confidence,
             imgsz=self._image_size,
             verbose=False,
         )[0]
-
-        return results.boxes.cpu(), results.names
 
     def close(self) -> None:
         """Drop the model and clear accelerator caches when available."""
