@@ -1,16 +1,14 @@
 import threading
 import queue
 import traceback
-import numpy as np
+import time
 
 from camera_cv.camera import Camera_Manager
-from models.yolo_world_module import YOLO_World_Manager
 from voice_text_convert.mic_whisper_manager import Whisper_Audio_Manager
 from voice_text_convert.parse_and_match_module import Text_Manager
 
-class_names_queue: queue.Queue[list[str]] = queue.Queue(maxsize=1)
-ready_model_queue: queue.Queue[
-    tuple[YOLO_World_Manager, list[str]]
+class_names_queue: queue.Queue[
+    tuple[list[str], float]
 ] = queue.Queue(maxsize=1)
 
 stop_event = threading.Event()
@@ -20,74 +18,23 @@ initialize_barrier = threading.Barrier(
 )
 
 def put_latest_classes(class_names:list[str])->None:
+    requested_at = time.perf_counter()
     try:
-        class_names_queue.put_nowait(class_names)
+        class_names_queue.put_nowait((class_names, requested_at))
     except queue.Full:
         try:
             class_names_queue.get_nowait()
         except queue.Empty:
             pass
-        class_names_queue.put_nowait(class_names)
+        class_names_queue.put_nowait((class_names, requested_at))
 
-
-def model_builder_worker() -> None:
-    """Build and warm a replacement model without touching the active model."""
-    while not stop_event.is_set():
-        try:
-            classes = class_names_queue.get(timeout=0.5)
-        except queue.Empty:
-            continue
-
-        # If several commands arrived, build only the newest class set.
-        while True:
-            try:
-                classes = class_names_queue.get_nowait()
-            except queue.Empty:
-                break
-
-        new_manager = None
-        try:
-            print(f"새 YOLO 모델 준비 시작: {classes}")
-            new_manager = YOLO_World_Manager(confidence=0.65)
-            new_manager.load()
-            new_manager.set_classes(classes)
-
-            dummy_frame = np.zeros((640, 640, 3), dtype=np.uint8)
-            new_manager.predict(dummy_frame)
-
-            # Do not publish a stale model if a newer voice command arrived
-            # while this model was being prepared.
-            if not class_names_queue.empty():
-                print(f"더 최신 요청이 있어 준비한 모델을 폐기합니다: {classes}")
-                new_manager.close()
-                new_manager = None
-                continue
-
-            try:
-                ready_model_queue.put_nowait((new_manager, classes))
-            except queue.Full:
-                old_ready_manager, _ = ready_model_queue.get_nowait()
-                old_ready_manager.close()
-                ready_model_queue.put_nowait((new_manager, classes))
-
-            print(
-                f"새 YOLO 모델 준비 완료: classes={classes}, "
-                f"device={new_manager.device}"
-            )
-            new_manager = None
-        except Exception as error:
-            print(f"새 YOLO 모델 준비 실패: {error}")
-            traceback.print_exc()
-        finally:
-            if new_manager is not None:
-                new_manager.close()
-
-def detecting_objects():
+def detecting_objects(supported_classes: list[str]):
     try:
         camera_manager = Camera_Manager(
             camera_index=1,
             thread_event=stop_event,
-            ready_model_queue=ready_model_queue,
+            class_names_queue=class_names_queue,
+            supported_classes=supported_classes,
         )
         camera_manager.load_model()
 
@@ -176,7 +123,6 @@ def voice_text_convert_worker(
 
 if __name__ == "__main__":
     voice_to_text_thread = None
-    model_builder_thread = None
 
     try:
         # 터미널 입력은 다른 스레드와 카메라를 시작하기 전에 완료한다.
@@ -185,6 +131,9 @@ if __name__ == "__main__":
             print(device)
 
         device_id = int(input("마이크 device id를 입력하세요: "))
+        with Text_Manager() as text_manager:
+            supported_classes = text_manager.get_supported_yolo_classes()
+
         whisper_audio_manager = Whisper_Audio_Manager(
             device_id=device_id,
             model_name="base",
@@ -201,14 +150,8 @@ if __name__ == "__main__":
             name="VoiceTextWorker",
             daemon=True,
         )
-        model_builder_thread = threading.Thread(
-            target=model_builder_worker,
-            name="YoloModelBuilder",
-            daemon=True,
-        )
-        model_builder_thread.start()
         voice_to_text_thread.start()
-        detecting_objects()
+        detecting_objects(supported_classes)
     except KeyboardInterrupt:
         print("종료 요청을 받았습니다.")
     finally:
@@ -217,13 +160,4 @@ if __name__ == "__main__":
             initialize_barrier.abort()
         if voice_to_text_thread is not None:
             voice_to_text_thread.join(timeout=5.0)
-        if model_builder_thread is not None:
-            model_builder_thread.join(timeout=5.0)
-
-        while True:
-            try:
-                unused_manager, _ = ready_model_queue.get_nowait()
-                unused_manager.close()
-            except queue.Empty:
-                break
    
