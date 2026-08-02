@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from models.model_config import (
+from detect_objects.models.model_config import (
     load_apple_sound_analysis_config,
     load_sam_audio_mlx_config,
 )

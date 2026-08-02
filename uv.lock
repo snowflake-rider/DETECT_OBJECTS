@@ -269,7 +269,7 @@ wheels = [
 [[package]]
 name = "detect-objects"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "clip" },
     { name = "cv2-enumerate-cameras" },

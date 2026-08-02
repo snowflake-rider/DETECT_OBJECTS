@@ -33,15 +33,32 @@ dist/
 # macOS
 .DS_Store
 
-# Model weights and exported inference artifacts
-model_artifacts/**
+# Downloaded model repositories, caches, checkpoints, and weights
+model_artifacts/
+model_cache/
+checkpoints/
+.cache/huggingface/
+.cache/torch/
+*.safetensors
+*.ckpt
+*.bin
 *.pt
 *.pth
+*.pkl
+*.joblib
+*.h5
+*.hdf5
+*.keras
+*.pb
 *.onnx
+*.onnx.data
 *.engine
 *.torchscript
 *.tflite
 *.mlmodel
+*.mlpackage
+*.mlmodelc/
+*.gguf
 
 # Training, inference, and application output
 runs/
@@ -67,3 +84,8 @@ tmp/
 temp/
 *.tmp
 *.log
+
+# Jupyter runtime and exported notebook output
+.ipynb_checkpoints/
+sound_model_notebooks/*.html
+sound_model_notebooks/*.pdf

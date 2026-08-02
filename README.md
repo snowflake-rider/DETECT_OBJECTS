@@ -3,6 +3,10 @@
 OpenCV 카메라 영상에서 YOLO-World로 객체를 탐지하는 실험용 Python
 프로젝트입니다.
 
+애플리케이션 코드는 `src/detect_objects/` 아래에 있는 src-layout Python
+패키지입니다. 자동화된 테스트는 `tests/`, 직접 실행하는 장치 점검 스크립트는
+`manual_checks/`, 성능 측정 스크립트는 `benchmarks/`에 분리되어 있습니다.
+
 ## uv 환경 설정
 
 이 프로젝트는 Python 3.11을 사용합니다. `uv`가 설치되어 있다면 다음 명령으로
@@ -15,10 +19,10 @@ uv sync --locked
 환경을 직접 활성화하지 않고 실행하려면 각 명령 앞에 `uv run`을 붙입니다.
 
 ```bash
-uv run python camera_cv/list_cameras.py
-uv run python camera_cv/camera_test.py
-uv run python camera_cv/camera.py --camera-index 0
-uv run python -m tui.app
+uv run odia
+uv run python -m detect_objects
+uv run python -m detect_objects.camera_cv.camera_cv --camera-index 0
+uv run python -m detect_objects.tui.app
 ```
 
 셸에서 환경을 활성화하려면 다음 명령을 사용합니다.
@@ -29,19 +33,19 @@ source .venv/bin/activate
 
 ## 주요 파일
 
-- `camera_cv/camera.py`: 카메라 영상을 받아 실시간 객체 탐지를 실행합니다.
-- `camera_cv/list_cameras.py`: 운영체제에 맞는 OpenCV 백엔드로 사용 가능한
-  카메라 인덱스를 찾습니다.
-- `camera_cv/camera_test.py`: 모델 없이 카메라 프리뷰만 확인합니다.
-- `device_setup/`: UI와 독립적으로 카메라와 마이크를 검색하고 선택 정보를
+- `src/detect_objects/camera_cv/camera_cv.py`: 선택된 카메라 영상을 받아 실시간 객체 탐지를
+  실행합니다.
+- `src/detect_objects/device_setup/`: UI와 독립적으로 카메라와 마이크를 검색하고 선택 정보를
   저장합니다.
-- `tui/`: Textual 장치 선택 화면과 애플리케이션 셸을 제공합니다.
-- `cli/`: 선택적으로 사용할 수 있는 Rich 기반 장치 설정 인터페이스입니다.
-- `models/device_selector.py`: MPS, CUDA, CPU 순으로 추론 장치를 선택합니다.
-- `models/model_config.py`: `config/models.toml`을 읽고 모델 설정과 가중치
+- `rpi/pi8-access/`: `pi8`의 Wi-Fi, Ethernet, Tailscale 접속과 신규 설치
+  절차를 설명합니다.
+- `src/detect_objects/tui/`: Textual 장치 선택 화면과 애플리케이션 셸을 제공합니다.
+- `__archived/cli/`: 이전 Rich 기반 장치 설정 인터페이스를 보존합니다.
+- `src/detect_objects/models/device_selector.py`: MPS, CUDA, CPU 순으로 추론 장치를 선택합니다.
+- `src/detect_objects/models/model_config.py`: `config/models.toml`을 읽고 모델 설정과 가중치
   경로를 검증합니다.
-- `models/yolo_world_module.py`: YOLO-World 모델의 로딩, 추론, 해제를 관리합니다.
-- `models/sound/`: Apple SoundAnalysis를 사용하는 macOS 사운드 분류 백엔드와
+- `src/detect_objects/models/yolo_world_module.py`: YOLO-World 모델의 로딩, 추론, 해제를 관리합니다.
+- `src/detect_objects/models/sound/`: Apple SoundAnalysis를 사용하는 macOS 사운드 분류 백엔드와
   공통 결과 타입, MLX 기반 SAM-Audio 음원 분리 백엔드를 제공합니다.
 - `config/models.toml`: 모델 가중치 경로와 추론 기본값을 저장합니다. 가중치
   경로는 이 TOML 파일을 기준으로 해석됩니다. Apple 내장 사운드 분류기는
@@ -52,13 +56,12 @@ source .venv/bin/activate
 ## 실행 예시
 
 ```bash
-python camera_cv/list_cameras.py
-python camera_cv/camera_test.py
-python camera_cv/camera.py --camera-index 0
-python -m tui.app
-python -m cli.device_setup
-python -m models.sound /path/to/audio.wav
-python -m models.sound.separate /path/to/mixed.wav \
+odia
+python -m detect_objects
+python -m detect_objects.camera_cv.camera_cv --camera-index 0
+python -m detect_objects.tui.app
+python -m detect_objects.models.sound /path/to/audio.wav
+python -m detect_objects.models.sound.separate /path/to/mixed.wav \
   --prompt "dog barking" \
   --output-dir outputs/sam_audio
 ```
@@ -84,30 +87,18 @@ OpenCV는 컴퓨터에 연결된 각 카메라를 `0`, `1`, `2` 같은 정수 �
 구분합니다. 일반적으로 내장 카메라는 `0`이지만, USB 카메라나 가상 카메라가
 연결되어 있으면 인덱스가 달라질 수 있습니다.
 
-먼저 사용 가능한 카메라 인덱스를 찾습니다.
-
-```bash
-python camera_cv/list_cameras.py
-```
-
-기본적으로 인덱스 `0`부터 `9`까지 검사합니다. 검사 범위나 프레임 읽기 재시도
-횟수를 변경하려면 다음 옵션을 사용합니다.
-
-```bash
-python camera_cv/list_cameras.py --max-index 15 --attempts 20
-```
-
-출력에서 `available`로 표시된 인덱스를 `--camera-index`에 전달합니다. 예를 들어
+Textual 장치 설정 마법사가 사용 가능한 카메라를 찾고 선택한 인덱스와 OpenCV
+백엔드를 `detect_objects.main`에 전달합니다. 감지 런타임만 단독으로 실행하면서
 카메라 `1`을 사용하려면 다음과 같이 실행합니다.
 
 ```bash
-python camera_cv/camera.py --camera-index 1
+python -m detect_objects.camera_cv.camera_cv --camera-index 1
 ```
 
 Textual 장치 설정 마법사를 실행하려면 다음 명령을 사용합니다.
 
 ```bash
-python -m tui.app
+python -m detect_objects.tui.app
 ```
 
 마법사는 오디오 출력, 오디오 입력, 비디오 입력 순서로 진행됩니다. 먼저 출력
