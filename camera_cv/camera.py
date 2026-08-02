@@ -64,7 +64,7 @@ class Camera_Manager:
     #Yolo world model
     def load_model(self):
         try:
-            self.__yolo_world_manager = YOLO_World_Manager(confidence=0.65)
+            self.__yolo_world_manager = YOLO_World_Manager()
             self.__yolo_world_manager.load()
             self.__yolo_world_manager.cache_class_embeddings(
                 self.__supported_classes

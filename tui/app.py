@@ -20,11 +20,23 @@ class OdiaApp(App[Context | None]):
     }
 
     #setup-panel {
-        width: 64;
+        width: 78;
+        max-width: 100%;
         height: auto;
         padding: 1 2;
         border: round $accent;
         background: $panel;
+    }
+
+    #device-columns {
+        width: 100%;
+        height: auto;
+    }
+
+    .device-panel {
+        width: 1fr;
+        height: auto;
+        padding: 0 1;
     }
 
     .field-label {
@@ -36,6 +48,17 @@ class OdiaApp(App[Context | None]):
         margin-bottom: 1;
     }
 
+    .device-actions {
+        height: auto;
+        margin-bottom: 1;
+    }
+
+    .device-actions Button {
+        width: 1fr;
+        min-width: 0;
+        margin-right: 1;
+    }
+
     #continue {
         width: 100%;
         margin-top: 1;
@@ -45,6 +68,11 @@ class OdiaApp(App[Context | None]):
         height: auto;
         margin-top: 1;
         text-align: center;
+    }
+
+    #microphone-level {
+        width: 100%;
+        margin-top: 1;
     }
     """
 
@@ -71,7 +99,8 @@ def main() -> int:
         return 1
 
     print(f"Camera: {context.camera.info.name}")
-    print(f"Microphone: {context.audio.info.name}")
+    print(f"Audio input: {context.audio_input.info.name}")
+    print(f"Audio output: {context.audio_output.info.name}")
     return 0
 
 

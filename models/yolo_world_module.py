@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import gc
 from pathlib import Path
-from typing import Sequence
+from typing import Self, Sequence
 
 import numpy as np
 import torch
@@ -12,7 +12,7 @@ from ultralytics import YOLOWorld
 from ultralytics.engine.results import Boxes
 
 from models.device_selector import DeviceInfo, DeviceSelector
-from typing import Self
+from models.model_config import DEFAULT_MODELS_CONFIG_PATH, load_yolo_world_config
 
 
 class YOLO_World_Manager:
@@ -20,15 +20,28 @@ class YOLO_World_Manager:
 
     def __init__(
         self,
-        model_path: str | Path = "yolov8s-worldv2.pt",
-        confidence: float = 0.25,
-        image_size: np.array = [640, 640],
+        model_path: str | Path | None = None,
+        confidence: float | None = None,
+        image_size: Sequence[int] | None = None,
+        config_path: str | Path = DEFAULT_MODELS_CONFIG_PATH,
     ) -> None:
         """Configure model location, confidence threshold, image size, and device."""
-        self._model_path = Path(model_path)
-        print(f"model path:{model_path}\n")
-        self._confidence = confidence
-        self._image_size = image_size
+        config = load_yolo_world_config(config_path)
+        self._model_path = Path(model_path).expanduser() if model_path else config.weights
+        self._confidence = config.confidence if confidence is None else confidence
+        self._image_size = list(config.image_size if image_size is None else image_size)
+
+        if not 0.0 <= self._confidence <= 1.0:
+            raise ValueError("confidence must be from 0.0 to 1.0")
+        if len(self._image_size) != 2 or any(
+            isinstance(dimension, bool)
+            or not isinstance(dimension, int)
+            or dimension <= 0
+            for dimension in self._image_size
+        ):
+            raise ValueError("image_size must contain two positive integers")
+
+        print(f"model path:{self._model_path}\n")
         self._device_info: DeviceInfo = DeviceSelector.select()
         self._model: YOLOWorld | None = None
         self._class_embedding_cache: dict[str, torch.Tensor] = {}

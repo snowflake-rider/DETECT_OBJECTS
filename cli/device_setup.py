@@ -1,4 +1,4 @@
-"""Rich command-line interface for selecting and testing input devices."""
+"""Rich command-line interface for selecting and testing devices."""
 
 from __future__ import annotations
 
@@ -13,7 +13,16 @@ from rich.prompt import Confirm, IntPrompt
 from rich.table import Table
 from rich.text import Text
 
-from device_setup import Audio, AudioInfo, Camera, CameraInfo, Context, Environment
+from device_setup import (
+    AudioInput,
+    AudioInputInfo,
+    AudioOutput,
+    AudioOutputInfo,
+    Camera,
+    CameraInfo,
+    Context,
+    Environment,
+)
 
 SILENCE_DB = -60.0
 console = Console()
@@ -94,9 +103,9 @@ def setup_camera() -> Camera | None:
     return camera
 
 
-def choose_audio() -> AudioInfo | None:
+def choose_audio_input() -> AudioInputInfo | None:
     """Display available microphones and return the selected device information."""
-    microphones = Audio.list_devices()
+    microphones = AudioInput.list_devices()
     if not microphones:
         console.print("[yellow]No input audio devices were found.[/yellow]")
         return None
@@ -138,7 +147,7 @@ def level_bar(rms: float, width: int = 30) -> Text:
     return Text(f"Sound Level [{bar}] {decibels:6.1f} dB")
 
 
-def test_audio(audio: Audio) -> bool:
+def test_audio_input(audio_input: AudioInput) -> bool:
     """Display live microphone input level until the user presses Ctrl+C."""
     rms = 0.0
     received_audio = False
@@ -149,15 +158,15 @@ def test_audio(audio: Audio) -> bool:
         received_audio = True
 
     console.print(
-        f"[green]Testing '{audio.info.name}'. Speak into the microphone.[/green]"
+        f"[green]Testing '{audio_input.info.name}'. Speak into the microphone.[/green]"
     )
     console.print("[cyan]Press Ctrl+C when you are ready to stop the test.[/cyan]")
 
     try:
         with sd.InputStream(
-            device=audio.info.index,
+            device=audio_input.info.index,
             channels=1,
-            samplerate=audio.info.samplerate,
+            samplerate=audio_input.info.samplerate,
             callback=record,
         ):
             with Live(console=console, refresh_per_second=20) as live:
@@ -178,40 +187,89 @@ def test_audio(audio: Audio) -> bool:
     return received_audio
 
 
-def setup_audio() -> Audio | None:
+def setup_audio_input() -> AudioInput | None:
     """Select a microphone and optionally test its input level."""
-    selected_info = choose_audio()
+    selected_info = choose_audio_input()
     if selected_info is None:
         console.print("[yellow]No microphone selected.[/yellow]")
         return None
 
-    audio = Audio(selected_info)
-    console.print(f"[green]Selected '{audio.info.name}'.[/green]")
+    audio_input = AudioInput(selected_info)
+    console.print(f"[green]Selected '{audio_input.info.name}'.[/green]")
     if not Confirm.ask(
         f"Do you want to test '{selected_info.name}'?",
         default=False,
     ):
         console.print("[yellow]Skipping audio test.[/yellow]")
-        return audio
+        return audio_input
 
-    if not test_audio(audio):
+    if not test_audio_input(audio_input):
         console.print("[red]Microphone test failed.[/red]")
         return None
     console.print("[green]Microphone test completed.[/green]")
-    return audio
+    return audio_input
+
+
+def choose_audio_output() -> AudioOutputInfo | None:
+    """Display audio outputs and return the selected device information."""
+    outputs = AudioOutput.list_devices()
+    if not outputs:
+        console.print("[yellow]No audio output devices were found.[/yellow]")
+        return None
+
+    default_output_index = int(sd.default.device[1])
+    table = Table(title="Available Audio Outputs")
+    table.add_column("Choice", justify="right", style="cyan")
+    table.add_column("Name", style="green")
+    table.add_column("Sample Rate", justify="right")
+    table.add_column("Default", justify="center")
+
+    for choice, output in enumerate(outputs, start=1):
+        table.add_row(
+            str(choice),
+            output.name,
+            f"{output.samplerate:.0f} Hz",
+            "✅" if output.index == default_output_index else "",
+        )
+
+    console.print(table)
+    while True:
+        choice = IntPrompt.ask(
+            f"Choose an audio output [1-{len(outputs)}], or 0 to cancel",
+            default=0,
+        )
+        if choice == 0:
+            return None
+        if 1 <= choice <= len(outputs):
+            return outputs[choice - 1]
+        console.print(f"[red]Enter a number between 1 and {len(outputs)}.[/red]")
+
+
+def setup_audio_output() -> AudioOutput | None:
+    """Select the audio output used for application playback."""
+    selected_info = choose_audio_output()
+    if selected_info is None:
+        console.print("[yellow]No audio output selected.[/yellow]")
+        return None
+
+    audio_output = AudioOutput(selected_info)
+    console.print(f"[green]Selected '{audio_output.info.name}'.[/green]")
+    return audio_output
 
 
 def build_context() -> Context | None:
     """Collect both device choices and build one runtime context."""
     camera = setup_camera()
-    audio = setup_audio()
-    if camera is None or audio is None:
+    audio_input = setup_audio_input()
+    audio_output = setup_audio_output()
+    if camera is None or audio_input is None or audio_output is None:
         console.print("[red]Context setup is incomplete.[/red]")
         return None
     return Context(
         environment=Environment.detect(),
         camera=camera,
-        audio=audio,
+        audio_input=audio_input,
+        audio_output=audio_output,
     )
 
 
@@ -225,7 +283,8 @@ def show_summary(context: Context) -> None:
         f"{context.environment.os} ({context.environment.machine})",
     )
     table.add_row("Camera", context.camera.info.name)
-    table.add_row("Audio", context.audio.info.name)
+    table.add_row("Audio Input", context.audio_input.info.name)
+    table.add_row("Audio Output", context.audio_output.info.name)
     console.print(table)
 
 

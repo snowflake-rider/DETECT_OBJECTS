@@ -58,9 +58,11 @@ recordings/
 *.mp4
 *.mov
 
+# Small, licensed fixtures used to smoke-test sound classification
+!samples/audio/*.wav
+
 # Temporary files
 tmp/
 temp/
 *.tmp
 *.log
-

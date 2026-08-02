@@ -38,7 +38,16 @@ source .venv/bin/activate
 - `tui/`: Textual 장치 선택 화면과 애플리케이션 셸을 제공합니다.
 - `cli/`: 선택적으로 사용할 수 있는 Rich 기반 장치 설정 인터페이스입니다.
 - `models/device_selector.py`: MPS, CUDA, CPU 순으로 추론 장치를 선택합니다.
+- `models/model_config.py`: `config/models.toml`을 읽고 모델 설정과 가중치
+  경로를 검증합니다.
 - `models/yolo_world_module.py`: YOLO-World 모델의 로딩, 추론, 해제를 관리합니다.
+- `models/sound/`: Apple SoundAnalysis를 사용하는 macOS 사운드 분류 백엔드와
+  공통 결과 타입을 제공합니다.
+- `config/models.toml`: 모델 가중치 경로와 추론 기본값을 저장합니다. 가중치
+  경로는 이 TOML 파일을 기준으로 해석됩니다. Apple 내장 사운드 분류기는
+  macOS가 관리하므로 별도의 가중치 경로가 필요하지 않습니다.
+- `model_artifacts/`: 로컬 모델 가중치를 저장합니다. 가중치 파일은 Git에서
+  제외됩니다.
 
 ## 실행 예시
 
@@ -48,7 +57,13 @@ python camera_cv/camera_test.py
 python camera_cv/camera.py --camera-index 0
 python -m tui.app
 python -m cli.device_setup
+python -m models.sound /path/to/audio.wav
 ```
+
+사운드 분류 명령은 macOS의 Apple SoundAnalysis를 사용합니다. 결과는 설정한
+임계값을 통과한 `cat_meow`, `dog_bark`, 엔진, 경주차 소리를 시간 구간별로
+출력합니다. 분석 구간, 겹침 비율, 레이블별 임계값은 `config/models.toml`에서
+조정할 수 있습니다.
 
 카메라 프리뷰에서는 `q`를 눌러 종료합니다.
 
@@ -83,6 +98,15 @@ Textual 화면에서 카메라와 마이크를 함께 선택하려면 다음 명
 ```bash
 python -m tui.app
 ```
+
+카메라를 선택하면 `Health Check` 버튼이 활성화됩니다. 테스트는 UI를 멈추지 않고
+백그라운드에서 카메라를 열어 프레임 수신 여부, 해상도, FPS를 확인합니다.
+`Snapshot Preview`는 한 프레임을, `Stream Preview`는 실시간 영상을 별도의
+OpenCV 창으로 표시합니다. `q` 또는 Escape를 누르면 프리뷰가 닫힙니다.
+오디오 입력과 출력 장치를 선택하고 `Monitor`를 누른 뒤 "안녕하세요"라고
+말합니다. 녹음하는 동안 Textual 진행 막대와 dB 값이 실시간으로 갱신됩니다.
+`Done`을 누르면 녹음을 끝내고 방금 녹음한 소리를 선택한 출력 장치로 자동
+재생합니다.
 
 카메라가 검색되지 않으면 다른 애플리케이션이 카메라를 사용 중인지 확인하고,
 운영체제 설정에서 터미널 또는 Python에 카메라 접근 권한이 허용되어 있는지
