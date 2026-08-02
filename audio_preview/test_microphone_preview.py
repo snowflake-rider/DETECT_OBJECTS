@@ -1,4 +1,4 @@
-"""Tests for the combined microphone monitor and playback workflow."""
+"""Tests for staged microphone monitoring, recording, and playback."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from audio_preview.microphone_preview import monitor_record_and_play
+from audio_preview.microphone_preview import monitor_and_record, play_recording
 from device_setup import AudioInput, AudioInputInfo, AudioOutput, AudioOutputInfo
 
 
@@ -31,7 +31,7 @@ class FakeInputStream:
 
 
 class MicrophonePreviewTests(unittest.TestCase):
-    """Verify simultaneous levels, recording, stopping, and playback."""
+    """Verify that recording and playback remain separate operations."""
 
     def setUp(self) -> None:
         self.audio_input = AudioInput(
@@ -51,7 +51,7 @@ class MicrophonePreviewTests(unittest.TestCase):
             )
         )
 
-    def test_monitors_records_and_plays_after_stop(self) -> None:
+    def test_monitors_and_retains_recording_after_stop(self) -> None:
         stop_event = Event()
         chunks = [
             np.array([[0.25], [-0.25]], dtype=np.float32),
@@ -69,19 +69,45 @@ class MicrophonePreviewTests(unittest.TestCase):
             ),
             patch("audio_preview.microphone_preview.sd.play") as play,
         ):
-            result = monitor_record_and_play(
+            result = monitor_and_record(
                 self.audio_input,
-                self.audio_output,
                 stop_event,
                 levels.append,
             )
 
         self.assertTrue(result.successful)
         self.assertEqual(len(levels), 2)
-        self.assertEqual(result.duration_seconds, 1.0)
-        self.assertAlmostEqual(result.peak_db, -6.0206, places=3)
-        recording = play.call_args.args[0]
-        np.testing.assert_array_equal(recording, np.concatenate(chunks))
+        self.assertIsNotNone(result.recording)
+        recording = result.recording
+        self.assertEqual(recording.duration_seconds, 1.0)
+        self.assertAlmostEqual(recording.peak_db, -6.0206, places=3)
+        np.testing.assert_array_equal(recording.samples, np.concatenate(chunks))
+        play.assert_not_called()
+
+    def test_plays_retained_recording_through_selected_output(self) -> None:
+        stop_event = Event()
+        chunks = [np.array([[0.5], [-0.5]], dtype=np.float32)]
+
+        def input_stream(**kwargs):
+            return FakeInputStream(chunks, stop_event, **kwargs)
+
+        with patch(
+            "audio_preview.microphone_preview.sd.InputStream",
+            side_effect=input_stream,
+        ):
+            recording_result = monitor_and_record(
+                self.audio_input,
+                stop_event,
+                lambda level: None,
+            )
+
+        with patch("audio_preview.microphone_preview.sd.play") as play:
+            playback_result = play_recording(
+                recording_result.recording,
+                self.audio_output,
+            )
+
+        self.assertTrue(playback_result.successful)
         self.assertEqual(play.call_args.kwargs["samplerate"], 4.0)
         self.assertEqual(play.call_args.kwargs["device"], 8)
         self.assertTrue(play.call_args.kwargs["blocking"])
@@ -96,9 +122,8 @@ class MicrophonePreviewTests(unittest.TestCase):
             "audio_preview.microphone_preview.sd.InputStream",
             side_effect=input_stream,
         ):
-            result = monitor_record_and_play(
+            result = monitor_and_record(
                 self.audio_input,
-                self.audio_output,
                 stop_event,
                 lambda level: None,
             )

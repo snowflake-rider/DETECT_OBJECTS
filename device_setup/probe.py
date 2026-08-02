@@ -35,7 +35,7 @@ class AudioInputProbeResult:
 
 @dataclass(frozen=True)
 class AudioOutputProbeResult:
-    """Outcome from submitting a test tone to one audio output."""
+    """Outcome from submitting a cat-like sample to one audio output."""
 
     available: bool
     error: str | None = None
@@ -150,7 +150,9 @@ def probe_audio_output(
     progress = times / duration_seconds
     glide = 1.55 - 0.85 * progress + 0.08 * np.sin(4 * math.pi * progress)
     instantaneous_frequency = frequency_hz * glide
-    phase = 2 * math.pi * np.cumsum(instantaneous_frequency) / audio_output.info.samplerate
+    phase = (
+        2 * math.pi * np.cumsum(instantaneous_frequency) / audio_output.info.samplerate
+    )
     voice = np.sin(phase) + 0.35 * np.sin(2 * phase) + 0.12 * np.sin(3 * phase)
     envelope = np.sin(math.pi * np.clip(progress, 0.0, 1.0)) ** 1.5
     meow = (0.08 * envelope * voice).astype(np.float32)

@@ -19,7 +19,6 @@ class CameraPreviewMode(str, Enum):
 
     SNAPSHOT = "snapshot"
     STREAM = "stream"
-    VERIFY = "verify"
 
 
 @dataclass(frozen=True)
@@ -81,41 +80,6 @@ def show_camera_preview(
             while not _window_should_close(window_name, 30):
                 pass
             return CameraPreviewResult(successful=True)
-
-        if mode is CameraPreviewMode.VERIFY:
-            cv2.imshow(window_name, frame)
-            while True:
-                key = cv2.waitKey(30) & 0xFF
-                if key in (ord(" "), 13):
-                    break
-                if key in (ord("q"), 27):
-                    return CameraPreviewResult(
-                        successful=False,
-                        error="Camera test closed before the live preview.",
-                    )
-                try:
-                    if cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:
-                        return CameraPreviewResult(
-                            successful=False,
-                            error="Camera test closed before the live preview.",
-                        )
-                except cv2.error:
-                    return CameraPreviewResult(
-                        successful=False,
-                        error="Camera test window was closed.",
-                    )
-
-            while True:
-                success, frame = capture.read()
-                if not success or frame is None:
-                    return CameraPreviewResult(
-                        successful=False,
-                        error="Camera stopped providing frames.",
-                    )
-
-                cv2.imshow(window_name, frame)
-                if _window_should_close(window_name, 1):
-                    return CameraPreviewResult(successful=True)
 
         while True:
             cv2.imshow(window_name, frame)

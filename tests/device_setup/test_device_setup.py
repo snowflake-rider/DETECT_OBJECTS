@@ -194,7 +194,7 @@ class CameraProbeTests(unittest.TestCase):
 
 
 class AudioProbeTests(unittest.TestCase):
-    """Verify input sampling and output-tone submission."""
+    """Verify input sampling and output-sample submission."""
 
     def setUp(self) -> None:
         self.audio_input = AudioInput(
@@ -241,7 +241,7 @@ class AudioProbeTests(unittest.TestCase):
         self.assertFalse(result.available)
         self.assertIn("input unavailable", result.error)
 
-    def test_output_submits_tone_to_selected_device(self) -> None:
+    def test_output_submits_cat_sample_to_selected_device(self) -> None:
         with patch("device_setup.probe.sd.play") as play:
             result = probe_audio_output(
                 self.audio_output,
@@ -253,7 +253,8 @@ class AudioProbeTests(unittest.TestCase):
         play.assert_called_once()
         tone = play.call_args.args[0]
         self.assertEqual(tone.shape, (2000,))
-        self.assertAlmostEqual(float(np.abs(tone).max()), 0.1, places=6)
+        self.assertGreater(float(np.abs(tone).max()), 0.01)
+        self.assertLessEqual(float(np.abs(tone).max()), 0.12)
         self.assertEqual(play.call_args.kwargs["samplerate"], 8000.0)
         self.assertEqual(play.call_args.kwargs["device"], 8)
         self.assertTrue(play.call_args.kwargs["blocking"])
