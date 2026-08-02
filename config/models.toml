@@ -16,3 +16,15 @@ dog_bark = 0.5
 engine = 0.5
 engine_accelerating_revving = 0.5
 race_car = 0.5
+
+[audio.source_separator]
+backend = "sam_audio_mlx"
+model_id = "mlx-community/sam-audio-small-fp16"
+artifact_dir = "../model_artifacts/audio/sam_audio_small_fp16"
+text_encoder_id = "google-t5/t5-base"
+text_encoder_dir = "../model_artifacts/audio/t5_base"
+chunk_seconds = 10.0
+overlap_seconds = 3.0
+ode_step_size = 0.0625
+ode_decode_chunk_size = 50
+seed = 42

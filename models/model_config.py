@@ -32,6 +32,22 @@ class AppleSoundAnalysisConfig:
     thresholds: Mapping[str, float]
 
 
+@dataclass(frozen=True)
+class SamAudioMlxConfig:
+    """Validated settings for prompt-guided SAM-Audio separation."""
+
+    backend: str
+    model_id: str
+    artifact_dir: Path
+    text_encoder_id: str
+    text_encoder_dir: Path
+    chunk_seconds: float
+    overlap_seconds: float
+    ode_step_size: float
+    ode_decode_chunk_size: int
+    seed: int
+
+
 def _load_document(config_path: str | Path) -> tuple[Path, dict[str, Any]]:
     """Read a TOML configuration file and return its resolved path and data."""
     resolved_config_path = Path(config_path).expanduser().resolve()
@@ -180,6 +196,102 @@ def load_apple_sound_analysis_config(
     )
 
 
+def load_sam_audio_mlx_config(
+    config_path: str | Path = DEFAULT_MODELS_CONFIG_PATH,
+) -> SamAudioMlxConfig:
+    """Load and validate the Apple-Silicon SAM-Audio separator settings."""
+    resolved_config_path, document = _load_document(config_path)
+
+    try:
+        section = document["audio"]["source_separator"]
+    except (KeyError, TypeError) as error:
+        raise ValueError(
+            "Model configuration requires an [audio.source_separator] section"
+        ) from error
+
+    if not isinstance(section, dict):
+        raise ValueError("[audio.source_separator] must be a TOML table")
+
+    backend = section.get("backend")
+    if backend != "sam_audio_mlx":
+        raise ValueError("audio.source_separator.backend must be 'sam_audio_mlx'")
+
+    model_id = section.get("model_id")
+    if not isinstance(model_id, str) or not model_id.strip():
+        raise ValueError("audio.source_separator.model_id must be non-empty")
+
+    artifact_dir_value = section.get("artifact_dir")
+    if not isinstance(artifact_dir_value, str) or not artifact_dir_value.strip():
+        raise ValueError("audio.source_separator.artifact_dir must be a path")
+    artifact_dir = Path(artifact_dir_value).expanduser()
+    if not artifact_dir.is_absolute():
+        artifact_dir = resolved_config_path.parent / artifact_dir
+    artifact_dir = artifact_dir.resolve()
+
+    text_encoder_id = section.get("text_encoder_id")
+    if not isinstance(text_encoder_id, str) or not text_encoder_id.strip():
+        raise ValueError("audio.source_separator.text_encoder_id must be non-empty")
+
+    text_encoder_dir_value = section.get("text_encoder_dir")
+    if (
+        not isinstance(text_encoder_dir_value, str)
+        or not text_encoder_dir_value.strip()
+    ):
+        raise ValueError("audio.source_separator.text_encoder_dir must be a path")
+    text_encoder_dir = Path(text_encoder_dir_value).expanduser()
+    if not text_encoder_dir.is_absolute():
+        text_encoder_dir = resolved_config_path.parent / text_encoder_dir
+    text_encoder_dir = text_encoder_dir.resolve()
+
+    chunk_seconds = _positive_number(
+        section.get("chunk_seconds"),
+        name="audio.source_separator.chunk_seconds",
+    )
+    overlap_seconds = _number_in_range(
+        section.get("overlap_seconds"),
+        name="audio.source_separator.overlap_seconds",
+        minimum=0.0,
+        maximum=chunk_seconds,
+        maximum_inclusive=False,
+    )
+    ode_step_size = _number_in_range(
+        section.get("ode_step_size"),
+        name="audio.source_separator.ode_step_size",
+        minimum=0.0,
+        maximum=1.0,
+        maximum_inclusive=False,
+    )
+    if ode_step_size == 0.0:
+        raise ValueError("audio.source_separator.ode_step_size must be greater than 0")
+
+    ode_decode_chunk_size = section.get("ode_decode_chunk_size")
+    if (
+        isinstance(ode_decode_chunk_size, bool)
+        or not isinstance(ode_decode_chunk_size, int)
+        or ode_decode_chunk_size <= 0
+    ):
+        raise ValueError(
+            "audio.source_separator.ode_decode_chunk_size must be a positive integer"
+        )
+
+    seed = section.get("seed")
+    if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+        raise ValueError("audio.source_separator.seed must be a non-negative integer")
+
+    return SamAudioMlxConfig(
+        backend=backend,
+        model_id=model_id.strip(),
+        artifact_dir=artifact_dir,
+        text_encoder_id=text_encoder_id.strip(),
+        text_encoder_dir=text_encoder_dir,
+        chunk_seconds=chunk_seconds,
+        overlap_seconds=overlap_seconds,
+        ode_step_size=ode_step_size,
+        ode_decode_chunk_size=ode_decode_chunk_size,
+        seed=seed,
+    )
+
+
 def _number_in_range(
     value: object,
     *,
@@ -198,4 +310,14 @@ def _number_in_range(
         upper = "]" if maximum_inclusive else ")"
         raise ValueError(f"{name} must be in [{minimum}, {maximum}{upper}")
 
+    return number
+
+
+def _positive_number(value: object, *, name: str) -> float:
+    """Validate and normalize a number that must be greater than zero."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{name} must be a number")
+    number = float(value)
+    if number <= 0.0:
+        raise ValueError(f"{name} must be greater than 0")
     return number

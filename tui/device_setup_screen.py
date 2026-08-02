@@ -22,23 +22,21 @@ from textual.widgets import (
     Static,
 )
 
-from audio_preview.microphone_preview import (
-    AudioRecording,
-    PlaybackResult,
-    RecordingResult,
-    monitor_and_record,
-    play_recording,
-)
 from device_setup import (
     AudioInput,
     AudioInputInfo,
     AudioOutput,
     AudioOutputInfo,
     AudioOutputProbeResult,
+    AudioRecording,
     Camera,
     CameraInfo,
     Context,
     Environment,
+    PlaybackResult,
+    RecordingResult,
+    monitor_and_record,
+    play_recording,
     probe_audio_output,
 )
 from opencv_preview.camera_preview import (
@@ -142,7 +140,7 @@ class AudioOutputScreen(Screen[AudioOutput]):
             yield Static("01 / AUDIO OUTPUT", classes="eyebrow")
             yield Static("Where should ODIA play sound?", classes="wizard-title")
             yield Static(
-                "Choose an output, then listen for a short cat meow.",
+                "Choose an output, then listen for the five-second cat meow sample.",
                 classes="wizard-copy",
             )
             yield Label("Audio output", classes="field-label")

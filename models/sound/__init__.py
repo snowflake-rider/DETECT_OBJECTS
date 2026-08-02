@@ -7,9 +7,11 @@ from pathlib import Path
 from models.model_config import (
     DEFAULT_MODELS_CONFIG_PATH,
     load_apple_sound_analysis_config,
+    load_sam_audio_mlx_config,
 )
 from models.sound.apple_sound_analysis import AppleSoundAnalysisClassifier
 from models.sound.base import SoundClassifier, SoundPrediction, SoundWindow
+from models.sound.sam_audio_mlx import SamAudioMlxSeparator
 
 
 def create_sound_classifier(
@@ -20,10 +22,19 @@ def create_sound_classifier(
     return AppleSoundAnalysisClassifier(config)
 
 
+def create_sound_separator(
+    config_path: str | Path = DEFAULT_MODELS_CONFIG_PATH,
+) -> SamAudioMlxSeparator:
+    """Create the configured prompt-guided sound separator."""
+    config = load_sam_audio_mlx_config(config_path)
+    return SamAudioMlxSeparator(config)
+
+
 __all__ = [
     "AppleSoundAnalysisClassifier",
     "SoundClassifier",
     "SoundPrediction",
     "SoundWindow",
     "create_sound_classifier",
+    "create_sound_separator",
 ]

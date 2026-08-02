@@ -42,7 +42,7 @@ source .venv/bin/activate
   경로를 검증합니다.
 - `models/yolo_world_module.py`: YOLO-World 모델의 로딩, 추론, 해제를 관리합니다.
 - `models/sound/`: Apple SoundAnalysis를 사용하는 macOS 사운드 분류 백엔드와
-  공통 결과 타입을 제공합니다.
+  공통 결과 타입, MLX 기반 SAM-Audio 음원 분리 백엔드를 제공합니다.
 - `config/models.toml`: 모델 가중치 경로와 추론 기본값을 저장합니다. 가중치
   경로는 이 TOML 파일을 기준으로 해석됩니다. Apple 내장 사운드 분류기는
   macOS가 관리하므로 별도의 가중치 경로가 필요하지 않습니다.
@@ -58,12 +58,23 @@ python camera_cv/camera.py --camera-index 0
 python -m tui.app
 python -m cli.device_setup
 python -m models.sound /path/to/audio.wav
+python -m models.sound.separate /path/to/mixed.wav \
+  --prompt "dog barking" \
+  --output-dir outputs/sam_audio
 ```
 
 사운드 분류 명령은 macOS의 Apple SoundAnalysis를 사용합니다. 결과는 설정한
 임계값을 통과한 `cat_meow`, `dog_bark`, 엔진, 경주차 소리를 시간 구간별로
 출력합니다. 분석 구간, 겹침 비율, 레이블별 임계값은 `config/models.toml`에서
 조정할 수 있습니다.
+
+SAM-Audio 명령은 Apple Silicon의 MLX GPU를 사용해 프롬프트로 지정한 소리를
+분리합니다. 첫 실행에는 약 1.2 GB인 Small FP16 체크포인트와 약 0.9 GB인 T5
+텍스트 인코더를 각각 `model_artifacts/audio/sam_audio_small_fp16/`와
+`model_artifacts/audio/t5_base/`에 내려받습니다. 이후에는 로컬 파일만으로
+실행합니다. 결과로 지정한 소리의 `__target.wav`와 나머지 소리의
+`__residual.wav`가 생성됩니다. 모델은 Apple SoundAnalysis와 달리 무거우므로
+우선 짧고 어려운 구간에만 사용합니다.
 
 카메라 프리뷰에서는 `q`를 눌러 종료합니다.
 

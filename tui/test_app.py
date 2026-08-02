@@ -10,19 +10,17 @@ import numpy as np
 from cv2_enumerate_cameras.camera_info import CameraInfo
 from textual.widgets import Button, Checkbox, ProgressBar, Select, Static
 
-from audio_preview.microphone_preview import (
-    AudioRecording,
-    PlaybackResult,
-    RecordingResult,
-)
 from device_setup import (
     AudioInput,
     AudioInputInfo,
     AudioOutput,
     AudioOutputInfo,
     AudioOutputProbeResult,
+    AudioRecording,
     Camera,
     Context,
+    PlaybackResult,
+    RecordingResult,
 )
 from opencv_preview.camera_preview import CameraPreviewMode, CameraPreviewResult
 from tui.app import OdiaApp

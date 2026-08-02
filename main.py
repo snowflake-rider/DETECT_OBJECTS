@@ -4,6 +4,7 @@ import traceback
 import time
 
 from camera_cv.camera import Camera_Manager
+from tui.app import run_app
 from voice_text_convert.mic_whisper_manager import Whisper_Audio_Manager
 from voice_text_convert.parse_and_match_module import Text_Manager
 
@@ -28,10 +29,11 @@ def put_latest_classes(class_names:list[str])->None:
             pass
         class_names_queue.put_nowait((class_names, requested_at))
 
-def detecting_objects(supported_classes: list[str]):
+def detecting_objects(supported_classes: list[str], camera):
     try:
         camera_manager = Camera_Manager(
-            camera_index=1,
+            camera_index=camera.info.index,
+            camera_backend=camera.info.backend,
             thread_event=stop_event,
             class_names_queue=class_names_queue,
             supported_classes=supported_classes,
@@ -125,12 +127,11 @@ if __name__ == "__main__":
     voice_to_text_thread = None
 
     try:
-        # 터미널 입력은 다른 스레드와 카메라를 시작하기 전에 완료한다.
-        devices = Whisper_Audio_Manager.get_input_devices()
-        for device in devices:
-            print(device)
+        context = run_app()
+        if context is None:
+            raise SystemExit(1)
 
-        device_id = int(input("마이크 device id를 입력하세요: "))
+        device_id = context.audio_input.info.index
         with Text_Manager() as text_manager:
             supported_classes = text_manager.get_supported_yolo_classes()
 
@@ -151,7 +152,7 @@ if __name__ == "__main__":
             daemon=True,
         )
         voice_to_text_thread.start()
-        detecting_objects(supported_classes)
+        detecting_objects(supported_classes, context.camera)
     except KeyboardInterrupt:
         print("종료 요청을 받았습니다.")
     finally:

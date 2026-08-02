@@ -34,6 +34,7 @@ dist/
 .DS_Store
 
 # Model weights and exported inference artifacts
+model_artifacts/**
 *.pt
 *.pth
 *.onnx

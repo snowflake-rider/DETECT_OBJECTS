@@ -29,12 +29,17 @@ class Camera_Manager:
             thread_event:threading.Event=None,
             class_names_queue: queue.Queue[tuple[list[str], float]] | None = None,
             supported_classes: list[str] | None = None,
+            camera_backend: int | None = None,
         ):
         """Open the requested camera and configure detectable classes."""
         # Camera indexes depend on the computer and its connected devices, so
         # the caller chooses the index instead of this class hard-coding it.
         self.__camera_index = camera_index
-        self.__backend = self._select_backend()
+        self.__backend = (
+            camera_backend
+            if camera_backend is not None
+            else self._select_backend()
+        )
         self.__manager_obj = cv2.VideoCapture(
             self.__camera_index,
             self.__backend,
