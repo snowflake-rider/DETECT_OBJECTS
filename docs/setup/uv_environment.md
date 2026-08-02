@@ -7,11 +7,11 @@
 ## Easy Run
 
 ```shell
-# Install and verify the locked environment.
+# Install dependencies and required model weights, then verify the environment.
 ./bootstrap/uv/setup.sh
 
 # Run the complete application.
-uv run odia
+UV_PROJECT_ENVIRONMENT=odia-uv uv run odia
 ```
 
 See [`bootstrap/README.md`](../../bootstrap/README.md) for the Conda path and

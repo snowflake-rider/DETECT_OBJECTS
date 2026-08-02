@@ -13,6 +13,9 @@ htmlcov/
 venv/
 env/
 .conda/
+odia-uv/
+bootstrap/reports/*.md
+!bootstrap/reports/README.md
 
 # Packaging and build output
 build/

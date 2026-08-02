@@ -13,9 +13,9 @@ Run:
 
 If `uv` is missing, the script installs it into the standard user executable
 directory without editing shell profiles. It then installs the locked Python
-3.11 environment into `.venv`, installs the local `detect_objects` package,
-and verifies required imports and runtime resources. The script prints the
-exact command to launch ODIA.
+3.11 environment into `odia-uv`, installs the local `detect_objects` package,
+downloads the required YOLO-World weights, and verifies required imports and
+runtime resources. The script prints the exact command to launch ODIA.
 
 ## Existing Conda
 
@@ -26,7 +26,8 @@ If Conda is already installed, run:
 ```
 
 This path works with an existing Miniconda, Miniforge, or Anaconda Distribution
-installation. It does not install Conda automatically.
+installation. It does not install Conda automatically and creates the
+`odia-conda` environment by default.
 
 ## Managed Miniconda
 
@@ -36,7 +37,7 @@ To install a private Miniconda distribution for ODIA, run:
 ./bootstrap/miniconda/setup.sh
 ```
 
-The default environment name is `odia`. To choose another name:
+The default environment name is `odia-miniconda`. To choose another name:
 
 ```bash
 ODIA_CONDA_ENV=my-environment ./bootstrap/miniconda/setup.sh
@@ -45,8 +46,9 @@ ODIA_CONDA_ENV=my-environment ./bootstrap/miniconda/setup.sh
 The managed path installs Miniconda under the standard user data directory
 without editing shell profiles. It supports macOS and Linux on Apple
 Silicon/ARM64 and x86-64. Both Conda paths create a Python 3.11 environment,
-install `requirements.txt` and the local src-layout package, verify the result,
-and print direct launch and activation commands.
+install `requirements.txt` and the local src-layout package, download the
+required YOLO-World weights, verify the result, and print direct launch and
+activation commands.
 
 The uv and managed Miniconda installers require either `curl` or `wget`. Custom
 install locations are available through `ODIA_UV_INSTALL_DIR` and

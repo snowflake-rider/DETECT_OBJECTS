@@ -68,10 +68,10 @@ def _load_document(config_path: str | Path) -> tuple[Path, dict[str, Any]]:
     return resolved_config_path, document
 
 
-def load_yolo_world_config(
+def _load_yolo_world_section(
     config_path: str | Path = DEFAULT_MODELS_CONFIG_PATH,
-) -> YoloWorldConfig:
-    """Load YOLO-World settings, resolving weights relative to the TOML file."""
+) -> tuple[Path, dict[str, Any]]:
+    """Load and validate the YOLO-World TOML section."""
     resolved_config_path, document = _load_document(config_path)
 
     try:
@@ -84,6 +84,14 @@ def load_yolo_world_config(
     if not isinstance(section, dict):
         raise ValueError("[vision.yolo_world] must be a TOML table")
 
+    return resolved_config_path, section
+
+
+def _resolve_yolo_world_weights(
+    resolved_config_path: Path,
+    section: Mapping[str, Any],
+) -> Path:
+    """Resolve the configured YOLO-World weights path without requiring it."""
     weights_value = section.get("weights")
     if not isinstance(weights_value, str) or not weights_value.strip():
         raise ValueError("vision.yolo_world.weights must be a non-empty path")
@@ -92,6 +100,24 @@ def load_yolo_world_config(
     if not weights.is_absolute():
         weights = resolved_config_path.parent / weights
     weights = weights.resolve()
+
+    return weights
+
+
+def configured_yolo_world_weights_path(
+    config_path: str | Path = DEFAULT_MODELS_CONFIG_PATH,
+) -> Path:
+    """Return the configured YOLO-World weights path, even when it is missing."""
+    resolved_config_path, section = _load_yolo_world_section(config_path)
+    return _resolve_yolo_world_weights(resolved_config_path, section)
+
+
+def load_yolo_world_config(
+    config_path: str | Path = DEFAULT_MODELS_CONFIG_PATH,
+) -> YoloWorldConfig:
+    """Load YOLO-World settings, resolving weights relative to the TOML file."""
+    resolved_config_path, section = _load_yolo_world_section(config_path)
+    weights = _resolve_yolo_world_weights(resolved_config_path, section)
 
     if not weights.is_file():
         raise FileNotFoundError(f"YOLO-World weights were not found: {weights}")

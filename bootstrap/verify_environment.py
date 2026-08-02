@@ -47,13 +47,23 @@ def main() -> int:
         errors.append(f"Missing Python modules: {', '.join(missing_modules)}")
 
     project_root = Path(__file__).resolve().parent.parent
-    required_files = (
+    required_files = [
         project_root / "config" / "models.toml",
         project_root / "samples" / "audio" / "cat_meow.wav",
-    )
+    ]
+
+    try:
+        from detect_objects.models.model_config import (
+            configured_yolo_world_weights_path,
+        )
+
+        required_files.append(configured_yolo_world_weights_path())
+    except (ImportError, OSError, TypeError, ValueError) as error:
+        errors.append(f"Unable to resolve configured model artifacts: {error}")
+
     missing_files = [str(path) for path in required_files if not path.is_file()]
     if missing_files:
-        errors.append(f"Missing repository files: {', '.join(missing_files)}")
+        errors.append(f"Missing required files: {', '.join(missing_files)}")
 
     if errors:
         for error in errors:

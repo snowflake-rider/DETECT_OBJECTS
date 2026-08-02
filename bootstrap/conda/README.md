@@ -9,8 +9,10 @@ From the repository root, run:
 ./bootstrap/conda/setup.sh
 ```
 
-Set `ODIA_CONDA_ENV` before running the script to use a different environment
-name. The script prints a direct ODIA launch command and an activation command.
+The default environment name is `odia-conda`. Set `ODIA_CONDA_ENV` before
+running the script to use a different name. The script prints a direct ODIA
+launch command and an activation command. After installing the Python package,
+it downloads the configured YOLO-World weights when they are missing.
 
 If `conda` is not on `PATH`, provide its executable explicitly:
 

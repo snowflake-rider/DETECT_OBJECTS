@@ -4,6 +4,15 @@ set -euo pipefail
 
 bootstrap_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_root="$(cd "${bootstrap_dir}/../.." && pwd)"
+conda_env_name="${ODIA_CONDA_ENV:-odia-miniconda}"
+
+source "${bootstrap_dir}/../reporting.sh"
+bootstrap_report_init \
+    "miniconda" \
+    "${conda_env_name}" \
+    "${project_root}" \
+    "bootstrap/miniconda/setup.sh"
+bootstrap_report_install_exit_trap
 
 download_file() {
     local url="$1"
@@ -59,6 +68,7 @@ default_data_dir="${XDG_DATA_HOME:-${HOME:-}/.local/share}"
 miniconda_install_dir="${ODIA_MINICONDA_INSTALL_DIR:-${ODIA_CONDA_INSTALL_DIR:-${default_data_dir}/odia/miniconda3}}"
 conda_command="${miniconda_install_dir}/bin/conda"
 
+bootstrap_report_step_start "Locate or install Miniconda"
 if [[ ! -x "${conda_command}" ]]; then
     if [[ -e "${miniconda_install_dir}" ]]; then
         echo "${miniconda_install_dir} exists but does not contain Conda." >&2
@@ -82,6 +92,11 @@ if [[ ! -x "${conda_command}" ]]; then
     echo "Miniconda installation did not produce ${conda_command}." >&2
     exit 1
 fi
+bootstrap_report_step_end
 
-ODIA_CONDA_COMMAND="${conda_command}" \
+bootstrap_report_step_start "Configure ODIA environment"
+ODIA_BOOTSTRAP_REPORT=0 \
+    ODIA_CONDA_ENV="${conda_env_name}" \
+    ODIA_CONDA_COMMAND="${conda_command}" \
     "${project_root}/bootstrap/conda/setup.sh"
+bootstrap_report_step_end

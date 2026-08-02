@@ -14,9 +14,10 @@ uv 또는 Conda 절차를 따릅니다.
 ## uv 환경 설정
 
 이 프로젝트는 Python 3.11을 사용합니다. `uv`가 설치되어 있다면 다음 명령으로
-프로젝트 전용 `.venv`를 만들고 잠긴 버전의 의존성을 설치할 수 있습니다.
+프로젝트 전용 `odia-uv` 환경을 만들고 잠긴 버전의 의존성을 설치할 수 있습니다.
 
 ```bash
+export UV_PROJECT_ENVIRONMENT=odia-uv
 uv sync --locked
 ```
 
@@ -32,7 +33,7 @@ uv run python -m detect_objects.tui.app
 셸에서 환경을 활성화하려면 다음 명령을 사용합니다.
 
 ```bash
-source .venv/bin/activate
+source odia-uv/bin/activate
 ```
 
 ## 주요 파일
@@ -55,7 +56,7 @@ source .venv/bin/activate
   경로는 이 TOML 파일을 기준으로 해석됩니다. Apple 내장 사운드 분류기는
   macOS가 관리하므로 별도의 가중치 경로가 필요하지 않습니다.
 - `model_artifacts/`: 로컬 모델 가중치를 저장합니다. 가중치 파일은 Git에서
-  제외됩니다.
+  제외되며 bootstrap 스크립트가 필수 YOLO-World 가중치를 내려받습니다.
 
 ## 실행 예시
 
