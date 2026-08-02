@@ -11,6 +11,7 @@ data directory without modifying shell profiles. It then delegates environment
 creation to `bootstrap/conda/setup.sh`. Automatic installation supports macOS
 and Linux on Apple Silicon/ARM64 and x86-64. The delegated setup also downloads
 the configured YOLO-World weights when they are missing.
+The latest timing report is written to `bootstrap/reports/miniconda.md`.
 
 The default environment name is `odia-miniconda`. Set `ODIA_CONDA_ENV` to
 choose a different name:

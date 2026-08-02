@@ -11,6 +11,7 @@ directory without modifying shell profiles. It then creates or updates the
 `odia-uv` environment directory from `uv.lock`, downloads the configured
 YOLO-World weights when they are missing, verifies the installation, and prints
 exact launch and activation commands.
+The latest timing report is written to `bootstrap/reports/uv.md`.
 
 Set `UV_PROJECT_ENVIRONMENT` to choose a different environment directory:
 

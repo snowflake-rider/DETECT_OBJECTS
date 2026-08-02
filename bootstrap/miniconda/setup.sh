@@ -79,7 +79,8 @@ if [[ ! -x "${conda_command}" ]]; then
     installer_name="$(miniconda_installer_name)"
     installer_temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/odia-miniconda-install.XXXXXX")"
     conda_installer="${installer_temp_dir}/${installer_name}"
-    trap 'rm -f "${conda_installer}"; rmdir "${installer_temp_dir}" 2>/dev/null || true' EXIT
+    bootstrap_report_register_cleanup_file "${conda_installer}"
+    bootstrap_report_register_cleanup_dir "${installer_temp_dir}"
 
     echo "Installing Miniconda into ${miniconda_install_dir}..."
     download_file \

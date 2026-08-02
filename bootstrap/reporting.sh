@@ -8,6 +8,10 @@ bootstrap_report_init() {
     bootstrap_report_project_root="$3"
     bootstrap_report_script="$4"
     bootstrap_report_enabled="${ODIA_BOOTSTRAP_REPORT:-1}"
+    bootstrap_report_cleanup_files=()
+    bootstrap_report_cleanup_dirs=()
+    bootstrap_report_cleanup_file_count=0
+    bootstrap_report_cleanup_dir_count=0
 
     if [[ "${bootstrap_report_enabled}" == "0" ]]; then
         return
@@ -20,8 +24,32 @@ bootstrap_report_init() {
     bootstrap_report_platform="$(uname -s) $(uname -m)"
     bootstrap_report_step_names=()
     bootstrap_report_step_seconds=()
+    bootstrap_report_step_count=0
     bootstrap_report_active_step=""
     bootstrap_report_active_epoch=""
+}
+
+bootstrap_report_register_cleanup_file() {
+    bootstrap_report_cleanup_files[bootstrap_report_cleanup_file_count]="$1"
+    bootstrap_report_cleanup_file_count=$((bootstrap_report_cleanup_file_count + 1))
+}
+
+bootstrap_report_register_cleanup_dir() {
+    bootstrap_report_cleanup_dirs[bootstrap_report_cleanup_dir_count]="$1"
+    bootstrap_report_cleanup_dir_count=$((bootstrap_report_cleanup_dir_count + 1))
+}
+
+bootstrap_report_cleanup() {
+    local cleanup_index cleanup_path
+
+    for ((cleanup_index = 0; cleanup_index < bootstrap_report_cleanup_file_count; cleanup_index++)); do
+        cleanup_path="${bootstrap_report_cleanup_files[cleanup_index]}"
+        rm -f "${cleanup_path}" || true
+    done
+    for ((cleanup_index = 0; cleanup_index < bootstrap_report_cleanup_dir_count; cleanup_index++)); do
+        cleanup_path="${bootstrap_report_cleanup_dirs[cleanup_index]}"
+        rmdir "${cleanup_path}" 2>/dev/null || true
+    done
 }
 
 bootstrap_report_step_start() {
@@ -46,8 +74,9 @@ bootstrap_report_step_end() {
     local finished_epoch elapsed_seconds
     finished_epoch="$(date +%s)"
     elapsed_seconds=$((finished_epoch - bootstrap_report_active_epoch))
-    bootstrap_report_step_names+=("${bootstrap_report_active_step}")
-    bootstrap_report_step_seconds+=("${elapsed_seconds}")
+    bootstrap_report_step_names[bootstrap_report_step_count]="${bootstrap_report_active_step}"
+    bootstrap_report_step_seconds[bootstrap_report_step_count]="${elapsed_seconds}"
+    bootstrap_report_step_count=$((bootstrap_report_step_count + 1))
     bootstrap_report_active_step=""
     bootstrap_report_active_epoch=""
 }
@@ -111,7 +140,7 @@ bootstrap_report_finish() {
             "${total_seconds}"
         printf '| Stage | Duration | Seconds |\n'
         printf '| --- | ---: | ---: |\n'
-        for ((step_index = 0; step_index < ${#bootstrap_report_step_names[@]}; step_index++)); do
+        for ((step_index = 0; step_index < bootstrap_report_step_count; step_index++)); do
             step_duration="${bootstrap_report_step_seconds[step_index]}"
             printf '| %s | %s | %s |\n' \
                 "${bootstrap_report_step_names[step_index]}" \
@@ -127,6 +156,7 @@ bootstrap_report_finish() {
 bootstrap_report_on_exit() {
     local exit_status="$?"
     trap - EXIT
+    bootstrap_report_cleanup
     if ! bootstrap_report_finish "${exit_status}"; then
         echo "Warning: unable to write the bootstrap report." >&2
     fi
@@ -134,7 +164,5 @@ bootstrap_report_on_exit() {
 }
 
 bootstrap_report_install_exit_trap() {
-    if [[ "${bootstrap_report_enabled:-0}" != "0" ]]; then
-        trap bootstrap_report_on_exit EXIT
-    fi
+    trap bootstrap_report_on_exit EXIT
 }

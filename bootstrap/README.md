@@ -54,6 +54,16 @@ The uv and managed Miniconda installers require either `curl` or `wget`. Custom
 install locations are available through `ODIA_UV_INSTALL_DIR` and
 `ODIA_MINICONDA_INSTALL_DIR`.
 
+## Timing reports
+
+Each top-level setup writes its latest Markdown timing report under
+`bootstrap/reports/`: `conda.md`, `miniconda.md`, or `uv.md`. Reports include
+the result, environment, total duration, and per-stage timings. Interrupted and
+failed runs are recorded too.
+
+Set `ODIA_BOOTSTRAP_REPORT_DIR` to use another report directory, or disable
+reporting with `ODIA_BOOTSTRAP_REPORT=0`.
+
 ## Verify an existing environment
 
 With the desired environment active, run:

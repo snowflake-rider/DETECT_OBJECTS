@@ -40,7 +40,7 @@ if [[ -z "${uv_command}" ]]; then
 
     uv_install_dir="${ODIA_UV_INSTALL_DIR:-${XDG_BIN_HOME:-${HOME}/.local/bin}}"
     uv_installer="$(mktemp "${TMPDIR:-/tmp}/odia-uv-install.XXXXXX")"
-    trap 'rm -f "${uv_installer}"' EXIT
+    bootstrap_report_register_cleanup_file "${uv_installer}"
 
     echo "uv was not found; installing it into ${uv_install_dir}..."
     download_file "https://astral.sh/uv/install.sh" "${uv_installer}"
