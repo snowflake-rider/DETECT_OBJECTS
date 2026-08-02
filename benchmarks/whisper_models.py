@@ -47,8 +47,7 @@ def record_audio() -> np.ndarray:
 
     if max_amplitude < 0.001:
         raise RuntimeError(
-            "마이크 입력이 너무 작습니다. "
-            "마이크 권한과 입력 장치를 확인하세요."
+            "마이크 입력이 너무 작습니다. 마이크 권한과 입력 장치를 확인하세요."
         )
 
     return audio
@@ -80,10 +79,7 @@ def levenshtein_distance(
     rows = len(reference) + 1
     columns = len(hypothesis) + 1
 
-    dp = [
-        [0 for _ in range(columns)]
-        for _ in range(rows)
-    ]
+    dp = [[0 for _ in range(columns)] for _ in range(rows)]
 
     for row in range(rows):
         dp[row][0] = row
@@ -99,8 +95,8 @@ def levenshtein_distance(
                 cost = 1
 
             dp[row][column] = min(
-                dp[row - 1][column] + 1,      # 삭제
-                dp[row][column - 1] + 1,      # 삽입
+                dp[row - 1][column] + 1,  # 삭제
+                dp[row][column - 1] + 1,  # 삽입
                 dp[row - 1][column - 1] + cost,  # 교체
             )
 
@@ -229,19 +225,11 @@ def benchmark_model(
         inference_times.append(inference_time)
         recognized_texts.append(recognized_text)
 
-        print(
-            f"{repeat_index + 1}회차: "
-            f"{inference_time:.3f}초 / "
-            f'"{recognized_text}"'
-        )
+        print(f'{repeat_index + 1}회차: {inference_time:.3f}초 / "{recognized_text}"')
 
-    average_inference_time = float(
-        np.mean(inference_times)
-    )
+    average_inference_time = float(np.mean(inference_times))
 
-    minimum_inference_time = float(
-        np.min(inference_times)
-    )
+    minimum_inference_time = float(np.min(inference_times))
 
     # 일반적으로 반복 결과는 같으므로 마지막 결과 사용
     final_text = recognized_texts[-1]
@@ -252,9 +240,7 @@ def benchmark_model(
     )
 
     # 오디오 1초를 처리하는 데 걸리는 시간
-    real_time_factor = (
-        average_inference_time / RECORD_SECONDS
-    )
+    real_time_factor = average_inference_time / RECORD_SECONDS
 
     result_data = {
         "model": model_name,
@@ -324,10 +310,7 @@ def main() -> None:
             results.append(result)
 
         except Exception as error:
-            print(
-                f"{model_name} 모델 측정 실패: "
-                f"{type(error).__name__}: {error}"
-            )
+            print(f"{model_name} 모델 측정 실패: {type(error).__name__}: {error}")
 
     print_summary(results)
 

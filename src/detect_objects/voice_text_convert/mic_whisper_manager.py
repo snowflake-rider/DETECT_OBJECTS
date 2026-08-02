@@ -16,10 +16,11 @@ import threading
 SAMPLE_RATE = 16000
 CHANNELS = 1
 RECORD_SECONDS = 5
-BLOCK_SIZE=1024
-MODEL_NAME="base"
+BLOCK_SIZE = 1024
+MODEL_NAME = "base"
 MAX_AUDIO_QUEUE_SIZE = 5
 MAX_RESULT_QUEUE_SIZE = 5
+
 
 class Whisper_Audio_Manager:
     #| 설정               | 의미               |
@@ -34,19 +35,19 @@ class Whisper_Audio_Manager:
     # | `language`       | Whisper가 인식할 언어  |
 
     def __init__(
-            self,
-            device_id,
-            model_name=MODEL_NAME,
-            sample_rate=SAMPLE_RATE,
-            channels=CHANNELS,
-            record_seconds=RECORD_SECONDS,
-            is_use_stream=False,
-            block_size=BLOCK_SIZE,
-            language='ko',
-            dtype="float32"
-        ):
+        self,
+        device_id,
+        model_name=MODEL_NAME,
+        sample_rate=SAMPLE_RATE,
+        channels=CHANNELS,
+        record_seconds=RECORD_SECONDS,
+        is_use_stream=False,
+        block_size=BLOCK_SIZE,
+        language="ko",
+        dtype="float32",
+    ):
         self.__device_id = device_id
-        self.__whisper_model:whisper.Whisper = None
+        self.__whisper_model: whisper.Whisper = None
         self.__model_name = model_name
         self.__sample_rate = sample_rate
         self.__channels = channels
@@ -56,46 +57,40 @@ class Whisper_Audio_Manager:
         self.__language = language
         self.__dtype = dtype
 
-        self.__stream:sd.InputStream | None = None
+        self.__stream: sd.InputStream | None = None
         self.__is_running = False
         # Keep enough audio while Whisper is transcribing the previous segment.
         blocks_per_recording = math.ceil(
-            self.__sample_rate
-            * self.__record_seconds
-            / self.__block_size
+            self.__sample_rate * self.__record_seconds / self.__block_size
         )
-        self.__audio_queue : queue.Queue[np.ndarray] = queue.Queue(
+        self.__audio_queue: queue.Queue[np.ndarray] = queue.Queue(
             maxsize=max(MAX_AUDIO_QUEUE_SIZE, blocks_per_recording * 2)
         )
 
-        self.__result_queue:queue.Queue[str] = queue.Queue(
+        self.__result_queue: queue.Queue[str] = queue.Queue(
             maxsize=MAX_RESULT_QUEUE_SIZE
         )
-        self.__worker_thread:threading.Thread|None = None
+        self.__worker_thread: threading.Thread | None = None
         self.__stop_event = threading.Event()
 
         self.__is_stream_running = False
 
     # 장치 목록 출력
     @staticmethod
-    def get_input_devices()->list[dict]:
+    def get_input_devices() -> list[dict]:
         devices = sd.query_devices()
 
-        input_devices:list[dict]=[]
+        input_devices: list[dict] = []
 
-        for device_id,device_info in enumerate(devices):
+        for device_id, device_info in enumerate(devices):
             if device_info["max_input_channels"] > 0:
                 input_devices.append(
                     {
                         "id": device_id,
                         "name": device_info["name"],
                         "hostapi": device_info["hostapi"],
-                        "max_input_channels": device_info[
-                            "max_input_channels"
-                        ],
-                        "default_samplerate": device_info[
-                            "default_samplerate"
-                        ],
+                        "max_input_channels": device_info["max_input_channels"],
+                        "default_samplerate": device_info["default_samplerate"],
                         "default_low_input_latency": device_info[
                             "default_low_input_latency"
                         ],
@@ -108,7 +103,7 @@ class Whisper_Audio_Manager:
 
     # device 에서 default 로 설정된 mic
     @staticmethod
-    def get_default_input_device_id()->int:
+    def get_default_input_device_id() -> int:
         default_device = sd.default.device
         default_input_device_id = default_device[0]
 
@@ -116,17 +111,15 @@ class Whisper_Audio_Manager:
             raise RuntimeError("No default device was setted")
 
         default_input_device_id = int(default_input_device_id)
-        if default_input_device_id <0 :
+        if default_input_device_id < 0:
             raise RuntimeError("No available input device")
         return default_input_device_id
+
     # mic 장치 점검
-    def validate_input_device(self,device_id:int)->None:
+    def validate_input_device(self, device_id: int) -> None:
         try:
-            device_info = sd.query_devices(
-                device=device_id,
-                kind="input"
-            )
-            if self.__channels>device_info["max_input_channels"]:
+            device_info = sd.query_devices(device=device_id, kind="input")
+            if self.__channels > device_info["max_input_channels"]:
                 raise ValueError(
                     f"요청한 채널 수는 {self.__channels}개이지만, "
                     f"장치가 지원하는 최대 입력 채널 수는 "
@@ -136,11 +129,14 @@ class Whisper_Audio_Manager:
                 device=device_id,
                 samplerate=self.__sample_rate,
                 channels=self.__channels,
-                dtype=self.__dtype
+                dtype=self.__dtype,
             )
             print("finished validation!\n")
         except sd.PortAudioError as error:
-            raise RuntimeError(f"입력 장치 설정을 사용할 수 없습니다: {error}") from error
+            raise RuntimeError(
+                f"입력 장치 설정을 사용할 수 없습니다: {error}"
+            ) from error
+
     @staticmethod
     def get_input_device_info(device_id: int) -> dict:
         try:
@@ -149,15 +145,12 @@ class Whisper_Audio_Manager:
                 kind="input",
             )
         except (sd.PortAudioError, ValueError) as error:
-            raise ValueError(
-                f"입력 장치 {device_id}를 찾을 수 없습니다."
-            ) from error
+            raise ValueError(f"입력 장치 {device_id}를 찾을 수 없습니다.") from error
 
         return dict(device_info)
-    # 선택한 mic 장비 상세 정보 설정해주는 method    
-    def select_input_device(
-        self
-    ) -> dict:
+
+    # 선택한 mic 장비 상세 정보 설정해주는 method
+    def select_input_device(self) -> dict:
         if self.__device_id is None:
             self.__device_id = self.get_default_input_device_id()
         self.validate_input_device(self.__device_id)
@@ -171,7 +164,7 @@ class Whisper_Audio_Manager:
         return device_info
 
     # create stream
-    def create_stream(self)->None:
+    def create_stream(self) -> None:
         if self.__device_id is None:
             raise RuntimeError("입력 장치가 선택되지 않았습니다")
         if self.__stream is not None:
@@ -183,12 +176,12 @@ class Whisper_Audio_Manager:
             channels=self.__channels,
             dtype=self.__dtype,
             blocksize=self.__block_size,
-            callback=self._audio_callback
+            callback=self._audio_callback,
         )
         print(f"마이크 스트림 생성 완료: {device_info['name']}")
 
     # start stream
-    def start_stream(self)->None:
+    def start_stream(self) -> None:
         if self.__stream is None:
             self.create_stream()
         if self.__stream.active:
@@ -198,7 +191,7 @@ class Whisper_Audio_Manager:
         print("마이크 입력 스트림을 시작했습니다")
 
     def stop_stream(self) -> None:
-        if self.__stream is  None:
+        if self.__stream is None:
             return
 
         if self.__stream.active and self.__is_running:
@@ -219,8 +212,6 @@ class Whisper_Audio_Manager:
 
         print("마이크 입력 스트림을 닫았습니다.")
 
-
-
     # Audio Input Stream
 
     # stream callback
@@ -236,27 +227,21 @@ class Whisper_Audio_Manager:
         if status:
             print(f"\n오디오 상태: {status}")
         try:
-            self.__audio_queue.put_nowait(
-                indata.copy()
-            )
+            self.__audio_queue.put_nowait(indata.copy())
         except queue.Full:
             pass
 
     # 지정된 시간 만큼 데이터를 모으는 메서드
     def collect_audio(self):
-        target_samples = int(
-            self.__sample_rate * self.__record_seconds
-        )
-        collected_blocks: list[np.ndarray]=[]
+        target_samples = int(self.__sample_rate * self.__record_seconds)
+        collected_blocks: list[np.ndarray] = []
         collected_samples = 0
 
         while collected_samples < target_samples:
             if self.__stop_event.is_set():
                 return None
             try:
-                block = self.__audio_queue.get(
-                    timeout=0.2
-                )
+                block = self.__audio_queue.get(timeout=0.2)
             except queue.Empty:
                 continue
 
@@ -272,45 +257,42 @@ class Whisper_Audio_Manager:
         )
         audio = audio[:target_samples]
         if audio.shape[1] == 1:
-            audio = audio[:,0] 
-        return audio.astype(np.float32,copy=False)
-    
+            audio = audio[:, 0]
+        return audio.astype(np.float32, copy=False)
+
     # load whisper model
-    def load_model(self)->None:
+    def load_model(self) -> None:
         if self.__whisper_model is not None:
             print("이미 로드되어져 있습니다\n")
             return
-        self.__whisper_model = whisper.load_model(name=self.__model_name,device="cpu")
+        self.__whisper_model = whisper.load_model(name=self.__model_name, device="cpu")
 
-    #transcribe
+    # transcribe
     def transcribe_audio(
         self,
-        audio:np.ndarray,
-    )->str:
+        audio: np.ndarray,
+    ) -> str:
         if self.__whisper_model is None:
             self.load_model()
-        if not isinstance(audio,np.ndarray):
+        if not isinstance(audio, np.ndarray):
             raise TypeError("audio 는 numpy.ndarray여야 합니다")
-        if audio.ndim !=1:
+        if audio.ndim != 1:
             raise ValueError(
-                f"Whisper 입력은 1차원이어야 합니다. "
-                f"현재 shape: {audio.shape}"
+                f"Whisper 입력은 1차원이어야 합니다. 현재 shape: {audio.shape}"
             )
         audio = audio.astype(
             np.float32,
             copy=False,
         )
         result = self.__whisper_model.transcribe(
-            audio=audio,
-            language=self.__language,
-            task="transcribe",
-            fp16=False
+            audio=audio, language=self.__language, task="transcribe", fp16=False
         )
         return result["text"].strip()
+
     # ---------------------------------------
     # --------worker thread-------
     # ---------------------------------------
-    def _worker(self)->None:
+    def _worker(self) -> None:
         print("start Audio worker")
         while not self.__stop_event.is_set():
             try:
@@ -332,9 +314,7 @@ class Whisper_Audio_Manager:
             except Exception as error:
                 if self.__stop_event.is_set():
                     break
-                print(
-                    f"Audio worker 오류: {error}"
-                )
+                print(f"Audio worker 오류: {error}")
                 traceback.print_exc()
         print("Audio worker 를 종료했습니다")
 
@@ -354,11 +334,8 @@ class Whisper_Audio_Manager:
             except queue.Full:
                 pass
 
-    def start_worker(self)-> None:
-        if(
-            self.__worker_thread is not None
-            and self.__worker_thread.is_alive() 
-        ):
+    def start_worker(self) -> None:
+        if self.__worker_thread is not None and self.__worker_thread.is_alive():
             return
         if self.__whisper_model is None:
             self.load_model()
@@ -368,19 +345,14 @@ class Whisper_Audio_Manager:
             name="WhisperAudioWorker",
             # Whisper 추론 자체가 외부 라이브러리 안에서 지연되더라도
             # 애플리케이션 종료를 영구적으로 막지 않도록 한다.
-            daemon=True
+            daemon=True,
         )
         self.__worker_thread.start()
 
-    def stop_worker(self)->None:
+    def stop_worker(self) -> None:
         self.__stop_event.set()
-        if (
-            self.__worker_thread is not None
-            and self.__worker_thread.is_alive()
-        ):
-            self.__worker_thread.join(
-                timeout=3.0
-            )
+        if self.__worker_thread is not None and self.__worker_thread.is_alive():
+            self.__worker_thread.join(timeout=3.0)
         self.__worker_thread = None
 
     # --------------------------------------------------
@@ -392,9 +364,7 @@ class Whisper_Audio_Manager:
         timeout: float | None = None,
     ) -> str | None:
         try:
-            return self.__result_queue.get(
-                timeout=timeout
-            )
+            return self.__result_queue.get(timeout=timeout)
 
         except queue.Empty:
             return None
@@ -412,37 +382,29 @@ class Whisper_Audio_Manager:
             except queue.Empty:
                 break
 
-    def start(self)->None:
+    def start(self) -> None:
         self.start_stream()
         self.start_worker()
 
-    def close(self)->None:
+    def close(self) -> None:
         # 새 오디오 유입을 먼저 중단하고 worker의 대기를 해제한다.
         self.stop_stream()
         self.stop_worker()
         self.close_stream()
-        self._clear_queue(
-            self.__audio_queue
-        )
-        self._clear_queue(
-            self.__result_queue
-        )
+        self._clear_queue(self.__audio_queue)
+        self._clear_queue(self.__result_queue)
+
 
 def main() -> None:
     manager: Whisper_Audio_Manager | None = None
 
     try:
-        devices = (
-            Whisper_Audio_Manager
-            .get_input_devices()
-        )
+        devices = Whisper_Audio_Manager.get_input_devices()
 
         for device in devices:
             print(device)
 
-        device_id = int(
-            input("마이크 device id를 입력하세요: ")
-        )
+        device_id = int(input("마이크 device id를 입력하세요: "))
 
         manager = Whisper_Audio_Manager(
             device_id=device_id,
@@ -460,9 +422,7 @@ def main() -> None:
         print("종료하려면 Ctrl+C를 누르세요.")
         with Text_Manager() as text_manager:
             while True:
-                text = manager.get_transcribed_text(
-                    timeout=0.5
-                )
+                text = manager.get_transcribed_text(timeout=0.5)
 
                 if text is not None:
                     print("\n========== 음성 인식 결과 ==========")

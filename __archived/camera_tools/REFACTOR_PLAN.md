@@ -121,9 +121,9 @@ from dataclasses import asdict, dataclass
 class CaptureBackend:
     """One door OpenCV can use to reach cameras."""
 
-    name: str                       # CLI 이름:         --backend avfoundation
-    constant: str                   # OpenCV 상수 이름:  getattr(cv2, ...)
-    label: str                      # 리포트에 적는 라벨
+    name: str  # CLI 이름:         --backend avfoundation
+    constant: str  # OpenCV 상수 이름:  getattr(cv2, ...)
+    label: str  # 리포트에 적는 라벨
     default_for: str | None = None  # 어느 OS의 기본이냐 (아니면 None)
 
 
@@ -132,8 +132,12 @@ ANY = CaptureBackend("any", "CAP_ANY", "OpenCV automatic")
 # 표 하나가 전부. 새 백엔드 추가 = 여기 한 줄.
 BACKENDS = (
     ANY,
-    CaptureBackend("avfoundation", "CAP_AVFOUNDATION", "AVFoundation", default_for="Darwin"),
-    CaptureBackend("msmf", "CAP_MSMF", "Microsoft Media Foundation", default_for="Windows"),
+    CaptureBackend(
+        "avfoundation", "CAP_AVFOUNDATION", "AVFoundation", default_for="Darwin"
+    ),
+    CaptureBackend(
+        "msmf", "CAP_MSMF", "Microsoft Media Foundation", default_for="Windows"
+    ),
     CaptureBackend("dshow", "CAP_DSHOW", "DirectShow"),  # 윈도우 대안, 기본 아님
     CaptureBackend("v4l2", "CAP_V4L2", "Video4Linux2", default_for="Linux"),
 )
@@ -217,9 +221,9 @@ PREVIEW_WINDOW = "confirm camera - press q"
 class Camera:
     """One camera the operating system reports as attached."""
 
-    index: int              # cv2.VideoCapture(index, backend) 에 넣을 값
-    name: str               # "FaceTime HD Camera"
-    path: str | None = None # 리눅스면 /dev/video0, 맥이면 uniqueID
+    index: int  # cv2.VideoCapture(index, backend) 에 넣을 값
+    name: str  # "FaceTime HD Camera"
+    path: str | None = None  # 리눅스면 /dev/video0, 맥이면 uniqueID
     vid: int | None = None  # USB 제조사 ID (리눅스/윈도우에서만)
     pid: int | None = None  # USB 제품 ID
 
@@ -692,7 +696,9 @@ from camera_tools.refactored.environment import Environment
 
 MAC = Environment(os="Darwin", release="test", machine="arm64", python="3.11")
 CAMERA = Camera(index=1, name="kafka-iphone Camera", path="578340B6")
-MIC = AudioDevice(index=3, name="MacBook Pro Microphone", channels=1, samplerate=48000.0)
+MIC = AudioDevice(
+    index=3, name="MacBook Pro Microphone", channels=1, samplerate=48000.0
+)
 
 
 class DeviceConfigTests(unittest.TestCase):
@@ -826,8 +832,11 @@ from camera_tools.refactored import audio
 
 FAKE_DEVICES = [
     {"name": "Speakers", "max_input_channels": 0, "default_samplerate": 48000.0},
-    {"name": "MacBook Pro Microphone", "max_input_channels": 1,
-     "default_samplerate": 48000.0},
+    {
+        "name": "MacBook Pro Microphone",
+        "max_input_channels": 1,
+        "default_samplerate": 48000.0,
+    },
     {"name": "USB Mic", "max_input_channels": 2, "default_samplerate": 44100.0},
 ]
 
@@ -837,8 +846,7 @@ class ListDevicesTests(unittest.TestCase):
         with patch.object(audio.sd, "query_devices", return_value=FAKE_DEVICES):
             found = audio.list_devices()
 
-        self.assertEqual([d.name for d in found],
-                         ["MacBook Pro Microphone", "USB Mic"])
+        self.assertEqual([d.name for d in found], ["MacBook Pro Microphone", "USB Mic"])
 
     def test_the_sounddevice_index_is_preserved(self) -> None:
         # 인덱스 0은 출력 전용이라 빠지지만, 남은 것들은 원래 번호를 유지해야
@@ -893,7 +901,7 @@ if __name__ == "__main__":
 ```python
 from camera_tools.refactored.config import DeviceConfig
 
-config = DeviceConfig.load()          # 없으면 예외 -> setup 먼저 돌리라고 안내
+config = DeviceConfig.load()  # 없으면 예외 -> setup 먼저 돌리라고 안내
 camera_index = config.camera.index
 device_id = config.audio.index
 ```

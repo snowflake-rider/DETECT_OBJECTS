@@ -48,5 +48,6 @@ def main() -> None:
     print(text)
     print(result)
 
+
 if __name__ == "__main__":
     main()

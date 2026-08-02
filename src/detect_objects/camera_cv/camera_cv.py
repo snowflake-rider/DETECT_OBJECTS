@@ -19,21 +19,19 @@ class Camera_Manager:
     """Coordinate camera capture, inference, and resource cleanup."""
 
     def __init__(
-            self,
-            camera_index,
-            thread_event:threading.Event=None,
-            class_names_queue: queue.Queue[tuple[list[str], float]] | None = None,
-            supported_classes: list[str] | None = None,
-            camera_backend: int | None = None,
-        ):
+        self,
+        camera_index,
+        thread_event: threading.Event = None,
+        class_names_queue: queue.Queue[tuple[list[str], float]] | None = None,
+        supported_classes: list[str] | None = None,
+        camera_backend: int | None = None,
+    ):
         """Open the requested camera and configure detectable classes."""
         # Camera indexes depend on the computer and its connected devices, so
         # the caller chooses the index instead of this class hard-coding it.
         self.__camera_index = camera_index
         self.__backend = (
-            camera_backend
-            if camera_backend is not None
-            else self._select_backend()
+            camera_backend if camera_backend is not None else self._select_backend()
         )
         self.__manager_obj = cv2.VideoCapture(
             self.__camera_index,
@@ -47,8 +45,9 @@ class Camera_Manager:
         ]
         self.__supported_classes = supported_classes or self.__classes
         self.__thread_event = thread_event or threading.Event()
-        self.__yolo_world_manager:YOLO_World_Manager = None 
+        self.__yolo_world_manager: YOLO_World_Manager = None
         self.__class_names_queue = class_names_queue
+
     def _select_backend(self) -> int:
         """Choose the native OpenCV video backend for the current OS."""
         os_name = platform.system()
@@ -60,15 +59,12 @@ class Camera_Manager:
         }
         return backend_map.get(os_name, cv2.CAP_ANY)
 
-
-    #Yolo world model
+    # Yolo world model
     def load_model(self):
         try:
             self.__yolo_world_manager = YOLO_World_Manager()
             self.__yolo_world_manager.load()
-            self.__yolo_world_manager.cache_class_embeddings(
-                self.__supported_classes
-            )
+            self.__yolo_world_manager.cache_class_embeddings(self.__supported_classes)
             self.__yolo_world_manager.activate_cached_classes(self.__classes)
         except Exception as e:
             print(e)
@@ -102,13 +98,14 @@ class Camera_Manager:
             f"[성능] 클래스 임베딩 변경 완료: {elapsed_seconds * 1000:.2f} ms "
             f"(classes={new_classes})"
         )
+
     # process start, end logic
     def start_record(self):
         """Start the detection preview and run until ``q`` or a read failure."""
         if not self.__manager_obj.isOpened():
             self._gc_resource()
             raise RuntimeError(f"camera index {self.__camera_index} is unavailable!")
-                
+
         while not self.__thread_event.is_set():
             is_success, frame = self.__manager_obj.read()
             if not is_success:
@@ -160,13 +157,14 @@ class Camera_Manager:
             self.__manager_obj.release()
         if self.__yolo_world_manager is not None:
             self.__yolo_world_manager.close()
-        if (self.__thread_event is not None) and (self.__thread_event.is_set()==False):
+        if (self.__thread_event is not None) and (
+            self.__thread_event.is_set() == False
+        ):
             self.__thread_event.set()
         cv2.destroyAllWindows()
 
     def unload(self):
         self._gc_resource()
-
 
 
 def parse_args():

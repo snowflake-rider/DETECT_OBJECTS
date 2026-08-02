@@ -113,7 +113,7 @@ red_bean = FishBread("팥")
 cream = FishBread("크림")
 
 red_bean.introduce()  # 나는 팥 붕어빵입니다.
-cream.introduce()     # 나는 크림 붕어빵입니다.
+cream.introduce()  # 나는 크림 붕어빵입니다.
 ```
 
 `red_bean.introduce()`를 호출할 때 `self`는 `red_bean`입니다.
@@ -146,7 +146,7 @@ class FishBread:
 ```
 
 ```python
-FishBread.is_valid_flavor("팥")    # True
+FishBread.is_valid_flavor("팥")  # True
 FishBread.is_valid_flavor("딸기")  # False
 ```
 

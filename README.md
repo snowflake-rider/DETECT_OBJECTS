@@ -4,8 +4,9 @@ OpenCV 카메라 영상에서 YOLO-World로 객체를 탐지하는 실험용 Pyt
 프로젝트입니다.
 
 애플리케이션 코드는 `src/detect_objects/` 아래에 있는 src-layout Python
-패키지입니다. 자동화된 테스트는 `tests/`, 직접 실행하는 장치 점검 스크립트는
-`manual_checks/`, 성능 측정 스크립트는 `benchmarks/`에 분리되어 있습니다.
+패키지입니다. 자동화된 테스트는 `tests/`, 성능 측정 스크립트는
+`benchmarks/`에 분리되어 있습니다.
+프로젝트 문서는 [`docs/index.md`](docs/index.md)에서 찾을 수 있습니다.
 
 ## uv 환경 설정
 
@@ -37,7 +38,7 @@ source .venv/bin/activate
   실행합니다.
 - `src/detect_objects/device_setup/`: UI와 독립적으로 카메라와 마이크를 검색하고 선택 정보를
   저장합니다.
-- `rpi/pi8-access/`: `pi8`의 Wi-Fi, Ethernet, Tailscale 접속과 신규 설치
+- `docs/platforms/raspberry-pi/pi8-access/`: `pi8`의 Wi-Fi, Ethernet, Tailscale 접속과 신규 설치
   절차를 설명합니다.
 - `src/detect_objects/tui/`: Textual 장치 선택 화면과 애플리케이션 셸을 제공합니다.
 - `__archived/cli/`: 이전 Rich 기반 장치 설정 인터페이스를 보존합니다.

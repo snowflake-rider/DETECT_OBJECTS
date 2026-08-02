@@ -117,9 +117,9 @@ class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIsInstance(app.screen, AudioOutputScreen)
                 output_next = app.screen.query_one("#next-output", Button)
                 self.assertTrue(output_next.disabled)
-                app.screen.query_one("#audio-output", Select).value = (
-                    self.audio_output.index
-                )
+                app.screen.query_one(
+                    "#audio-output", Select
+                ).value = self.audio_output.index
                 await pilot.pause()
                 await pilot.click("#play-output-sample")
                 await app.workers.wait_for_complete()
@@ -134,9 +134,9 @@ class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
 
                 self.assertIsInstance(app.screen, AudioInputScreen)
                 input_next = app.screen.query_one("#next-input", Button)
-                app.screen.query_one("#audio-input", Select).value = (
-                    self.audio_input.index
-                )
+                app.screen.query_one(
+                    "#audio-input", Select
+                ).value = self.audio_input.index
                 await pilot.pause()
                 await pilot.click("#monitor-input")
                 await pilot.pause(0.1)

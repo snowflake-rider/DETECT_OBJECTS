@@ -8,9 +8,7 @@ from .tui.app import run_app
 from .voice_text_convert.mic_whisper_manager import Whisper_Audio_Manager
 from .voice_text_convert.parse_and_match_module import Text_Manager
 
-class_names_queue: queue.Queue[
-    tuple[list[str], float]
-] = queue.Queue(maxsize=1)
+class_names_queue: queue.Queue[tuple[list[str], float]] = queue.Queue(maxsize=1)
 
 stop_event = threading.Event()
 initialize_barrier = threading.Barrier(
@@ -18,7 +16,8 @@ initialize_barrier = threading.Barrier(
     action=lambda: print("loading finished"),
 )
 
-def put_latest_classes(class_names:list[str])->None:
+
+def put_latest_classes(class_names: list[str]) -> None:
     requested_at = time.perf_counter()
     try:
         class_names_queue.put_nowait((class_names, requested_at))
@@ -28,6 +27,7 @@ def put_latest_classes(class_names:list[str])->None:
         except queue.Empty:
             pass
         class_names_queue.put_nowait((class_names, requested_at))
+
 
 def detecting_objects(supported_classes: list[str], camera):
     try:
@@ -51,8 +51,8 @@ def detecting_objects(supported_classes: list[str], camera):
         traceback.print_exc()
         stop_event.set()
         initialize_barrier.abort()
-        return 
-    # camera manager 시작 
+        return
+    # camera manager 시작
     try:
         camera_manager.start_record()
     except Exception as e:
@@ -74,13 +74,13 @@ def voice_text_convert_worker(
         print("barrier was destructed..\n")
         stop_event.set()
         whisper_audio_manager.close()
-        return 
+        return
     except Exception as e:
         print(e)
         stop_event.set()
         initialize_barrier.abort()
         whisper_audio_manager.close()
-        return 
+        return
 
     try:
         whisper_audio_manager.start()
@@ -88,9 +88,7 @@ def voice_text_convert_worker(
         print("종료하려면 Ctrl+C를 누르세요.")
         with Text_Manager() as text_manager:
             while not stop_event.is_set():
-                text = whisper_audio_manager.get_transcribed_text(
-                    timeout=0.5
-                ) 
+                text = whisper_audio_manager.get_transcribed_text(timeout=0.5)
                 if text is not None:
                     print(f"음성 텍스트 수신: {text}")
                     detected_class_names = text_manager.extract(text)
@@ -122,6 +120,7 @@ def voice_text_convert_worker(
             stop_event.set()
     finally:
         whisper_audio_manager.close()
+
 
 def main() -> int:
     """Run device setup, voice control, and camera detection."""

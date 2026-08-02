@@ -59,9 +59,7 @@ def find_cameras(max_index: int, attempts: int) -> list[int]:
             fps = camera.get(cv2.CAP_PROP_FPS)
             available_indexes.append(index)
 
-            print(
-                f"[{index}] available " f"({width}x{height}, reported FPS: {fps:.1f})"
-            )
+            print(f"[{index}] available ({width}x{height}, reported FPS: {fps:.1f})")
         finally:
             camera.release()
 
