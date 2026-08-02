@@ -34,29 +34,67 @@ function Invoke-Program {
     }
 }
 
-# Ask until the user chooses 1, 2, or 3.
+# Let the user choose with arrow keys, Enter, or number shortcuts.
 function Choose-Manager {
     if ([Console]::IsInputRedirected) {
         throw "Cannot open the menu. Choose directly: .\bootstrap\setup.ps1 uv"
     }
 
-    Write-Host "ODIA setup (Windows)"
-    Write-Host "1) uv (recommended: faster)"
-    Write-Host "2) Conda"
-    Write-Host "3) Miniconda"
-    Write-Host
-    Write-Host "Press Ctrl+C to cancel."
+    $Options = @("uv", "conda", "miniconda")
+    $Labels = @("⚡ uv (recommended)", "🐍 Conda", "📦 Miniconda")
+    $SelectedIndex = 0
+    $Escape = [char]27
 
-    while ($true) {
-        # Read-Host displays the prompt and saves the answer in $Choice.
-        $Choice = Read-Host "Choose 1-3"
+    # Use a temporary screen while the menu is open.
+    Write-Host "${Escape}[?1049h" -NoNewline
 
-        switch ($Choice) {
-            "1" { return "uv" }
-            "2" { return "conda" }
-            "3" { return "miniconda" }
-            default { Write-Host "Please choose 1, 2, or 3." }
+    try {
+        while ($true) {
+            # Clear the temporary screen and move the cursor to the top.
+            Write-Host "${Escape}[2J${Escape}[H" -NoNewline
+            Write-Host "🛠️  ODIA setup (Windows)"
+            Write-Host
+
+            for ($Index = 0; $Index -lt $Options.Count; $Index++) {
+                if ($Index -eq $SelectedIndex) {
+                    Write-Host "> $($Labels[$Index])" -ForegroundColor Cyan
+                }
+                else {
+                    Write-Host "  $($Labels[$Index])"
+                }
+            }
+
+            Write-Host
+            Write-Host "Use ↑/↓ and Enter, or press 1-3. Press Q or Ctrl+C to cancel."
+
+            # Read one key immediately without displaying it.
+            $Key = [Console]::ReadKey($true)
+
+            switch ($Key.Key) {
+                "UpArrow" {
+                    if ($SelectedIndex -gt 0) {
+                        $SelectedIndex--
+                    }
+                }
+                "DownArrow" {
+                    if ($SelectedIndex -lt $Options.Count - 1) {
+                        $SelectedIndex++
+                    }
+                }
+                "Enter" { return $Options[$SelectedIndex] }
+                "D1" { return "uv" }
+                "NumPad1" { return "uv" }
+                "D2" { return "conda" }
+                "NumPad2" { return "conda" }
+                "D3" { return "miniconda" }
+                "NumPad3" { return "miniconda" }
+                "Q" { exit 130 }
+            }
         }
+    }
+    finally {
+        # Always restore the user's original terminal screen.
+        Write-Host "${Escape}[?1049l" -NoNewline
     }
 }
 

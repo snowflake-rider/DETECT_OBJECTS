@@ -45,10 +45,12 @@ class SetupSelectorTests(unittest.TestCase):
     def test_windows_entrypoint_uses_native_installers_and_paths(self) -> None:
         script = WINDOWS_SETUP_SCRIPT.read_text(encoding="utf-8")
 
-        self.assertIn('Write-Host "1) uv (recommended: faster)"', script)
-        self.assertIn('Write-Host "2) Conda"', script)
-        self.assertIn('Write-Host "3) Miniconda"', script)
-        self.assertIn('Read-Host "Choose 1-3"', script)
+        self.assertIn('"⚡ uv (recommended)"', script)
+        self.assertIn('"🐍 Conda"', script)
+        self.assertIn('"📦 Miniconda"', script)
+        self.assertIn("[Console]::ReadKey", script)
+        self.assertIn('"UpArrow"', script)
+        self.assertIn('"DownArrow"', script)
         self.assertIn("uv.exe", script)
         self.assertIn("UV_UNMANAGED_INSTALL", script)
         self.assertIn('Join-Path $ProjectRoot ".odia"', script)
