@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from textual.app import App
-from textual.theme import Theme
 
 from ..device_setup import AudioInput, AudioOutput, Camera, Context
+from ..launch_mode import RuntimeMode
 from ..models import ModelSelection
+from ..ui_theme import DEFAULT_UI_THEME, UI_THEME_NAMES
 from .device_setup_screen import (
     AudioInputScreen,
     AudioOutputScreen,
@@ -17,30 +20,14 @@ from .device_setup_screen import (
     WelcomeScreen,
 )
 from .startup_screen import StartupScreen, StartupTask
-
-# Use the same RGB colors in every terminal instead of its 16-color palette.
-ODIA_THEME = Theme(
-    name="odia",
-    primary="#2563eb",
-    secondary="#0ea5e9",
-    accent="#7dd3fc",
-    foreground="#e5eef8",
-    background="#07111f",
-    surface="#0d1b2a",
-    panel="#132238",
-    boost="#1b3150",
-    success="#22c55e",
-    warning="#f59e0b",
-    error="#ef4444",
-    dark=True,
-    ansi=False,
-)
+from .runtime_mode_screen import RuntimeModeScreen
 
 
-def _apply_odia_theme(app: App) -> None:
-    """Register and select ODIA's fixed color palette."""
-    app.register_theme(ODIA_THEME)
-    app.theme = ODIA_THEME.name
+def _apply_theme(app: App, theme_name: str) -> None:
+    """Apply one of the themes offered by the welcome screen."""
+    if theme_name not in UI_THEME_NAMES:
+        raise ValueError(f"Unknown TUI theme: {theme_name}")
+    app.theme = theme_name
 
 
 class OdiaApp(App[Context | None]):
@@ -97,16 +84,34 @@ class OdiaApp(App[Context | None]):
         color: $accent;
     }
 
+    .theme-picker {
+        width: 100%;
+        height: 3;
+        margin-top: 1;
+        align: center middle;
+    }
+
+    .theme-label {
+        width: 18;
+        color: $text-muted;
+        text-align: right;
+        padding-right: 2;
+    }
+
+    .theme-picker Select {
+        width: 1fr;
+        margin-bottom: 0;
+    }
+
     .feature-list {
         width: 100%;
         height: auto;
-        margin: 2 0;
+        margin: 1 0;
     }
 
     .feature-row {
         width: 100%;
-        height: 4;
-        margin-bottom: 1;
+        height: 3;
         padding: 0 2;
         border-left: thick $primary;
         background: $boost;
@@ -265,6 +270,21 @@ class OdiaApp(App[Context | None]):
         margin-top: 1;
     }
 
+    .runtime-mode-set {
+        width: 100%;
+        height: auto;
+        margin: 1 0;
+        padding: 1 2;
+        border: round $primary;
+        background: $boost;
+    }
+
+    .runtime-mode-choice {
+        width: 100%;
+        height: 3;
+        padding: 0 1;
+    }
+
     .summary-card {
         width: 100;
         text-align: center;
@@ -288,10 +308,11 @@ class OdiaApp(App[Context | None]):
     def __init__(self) -> None:
         super().__init__()
         self.session = SetupSession()
+        self._completed_context: Context | None = None
 
     def on_mount(self) -> None:
         """Open the welcome page as the first wizard screen."""
-        _apply_odia_theme(self)
+        _apply_theme(self, DEFAULT_UI_THEME)
         self.push_screen(WelcomeScreen(), self._welcome_finished)
 
     def _welcome_finished(self, started: bool) -> None:
@@ -318,8 +339,21 @@ class OdiaApp(App[Context | None]):
         self.push_screen(SummaryScreen(self.session), self.finish_device_setup)
 
     def finish_device_setup(self, context: Context) -> None:
-        """Return the confirmed runtime context after the summary page."""
-        self.exit(context)
+        """Ask how to launch after every device and model is confirmed."""
+        self._completed_context = context
+        self.push_screen(RuntimeModeScreen(), self._runtime_mode_finished)
+
+    def _runtime_mode_finished(self, runtime_mode: RuntimeMode) -> None:
+        """Return setup selections with the chosen runtime interface."""
+        if self._completed_context is None:
+            raise RuntimeError("Runtime mode was selected before setup completed.")
+        self.exit(
+            replace(
+                self._completed_context,
+                ui_theme=self.theme,
+                runtime_mode=runtime_mode,
+            )
+        )
 
 
 class StartupApp(App[bool | None]):
@@ -338,12 +372,17 @@ class StartupApp(App[bool | None]):
 
     BINDINGS = [("q", "quit", "Quit")]
 
-    def __init__(self, startup_task: StartupTask) -> None:
+    def __init__(
+        self,
+        startup_task: StartupTask,
+        theme_name: str = DEFAULT_UI_THEME,
+    ) -> None:
         super().__init__()
         self.startup_task = startup_task
+        self.theme_name = theme_name
 
     def on_mount(self) -> None:
-        _apply_odia_theme(self)
+        _apply_theme(self, self.theme_name)
         self.push_screen(StartupScreen(self.startup_task), self.exit)
 
 
@@ -352,9 +391,12 @@ def run_app() -> Context | None:
     return OdiaApp().run()
 
 
-def run_startup_app(startup_task: StartupTask) -> bool:
+def run_startup_app(
+    startup_task: StartupTask,
+    theme_name: str = DEFAULT_UI_THEME,
+) -> bool:
     """Show runtime preparation and return whether startup succeeded."""
-    return StartupApp(startup_task).run() is True
+    return StartupApp(startup_task, theme_name).run() is True
 
 
 def main() -> int:

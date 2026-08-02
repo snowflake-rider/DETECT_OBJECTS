@@ -89,7 +89,7 @@ class StartupScreen(Screen[bool]):
         if update.step not in STARTUP_STEPS:
             raise ValueError(f"Unknown startup step: {update.step}")
 
-        marker = "[green]✓[/]" if update.finished else "[cyan]●[/]"
+        marker = "[$success]✓[/]" if update.finished else "[$accent]●[/]"
         self.query_one(f"#startup-{update.step}", Static).update(
             f"{marker}  {update.message}"
         )
@@ -108,7 +108,7 @@ class StartupScreen(Screen[bool]):
     @on(PreparationFailed)
     def preparation_failed(self, message: PreparationFailed) -> None:
         self.query_one("#startup-status", Static).update(
-            f"[red]Startup failed:[/] {message.error}"
+            f"[$error]Startup failed:[/] {message.error}"
         )
         button = self.query_one("#finish-startup", Button)
         button.label = "Close"

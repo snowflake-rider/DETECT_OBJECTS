@@ -6,7 +6,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from ..launch_mode import RuntimeMode
 from ..models.catalog import ModelSelection
+from ..ui_theme import DEFAULT_UI_THEME
 from .environment import Environment
 
 # TYPE_CHECKING is False while Python runs, so these imports are skipped.
@@ -26,3 +28,5 @@ class Context:
     audio_input: AudioInput
     audio_output: AudioOutput
     models: ModelSelection = field(default_factory=ModelSelection)
+    ui_theme: str = DEFAULT_UI_THEME
+    runtime_mode: RuntimeMode = RuntimeMode.CLASSIC

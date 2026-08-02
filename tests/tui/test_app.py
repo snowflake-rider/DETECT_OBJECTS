@@ -22,6 +22,7 @@ from detect_objects.device_setup import (
     PlaybackResult,
     RecordingResult,
 )
+from detect_objects.launch_mode import RuntimeMode
 from detect_objects.opencv_preview.camera_preview import (
     CameraPreviewMode,
     CameraPreviewResult,
@@ -31,7 +32,7 @@ from detect_objects.models import (
     ModelSelection,
 )
 from detect_objects.runtime import STARTUP_STEPS, StartupUpdate
-from detect_objects.tui.app import ODIA_THEME, OdiaApp, StartupApp
+from detect_objects.tui.app import OdiaApp, StartupApp
 from detect_objects.tui.device_setup_screen import (
     AudioInputScreen,
     AudioOutputScreen,
@@ -41,6 +42,8 @@ from detect_objects.tui.device_setup_screen import (
     WelcomeScreen,
 )
 from detect_objects.tui.startup_screen import StartupScreen
+from detect_objects.tui.runtime_mode_screen import RuntimeModeScreen
+from detect_objects.ui_theme import DEFAULT_UI_THEME, UI_THEME_NAMES
 
 
 class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
@@ -73,10 +76,16 @@ class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
 
-            self.assertEqual(app.theme, ODIA_THEME.name)
+            self.assertEqual(app.theme, DEFAULT_UI_THEME)
             self.assertFalse(app.current_theme.ansi)
-            self.assertEqual(app.current_theme.background, "#07111f")
+            self.assertEqual(app.current_theme.background, "#100F0F")
             self.assertIsInstance(app.screen, WelcomeScreen)
+            theme_select = app.screen.query_one("#ui-theme", Select)
+            self.assertEqual(theme_select.selection, DEFAULT_UI_THEME)
+            for theme_name in UI_THEME_NAMES:
+                theme_select.value = theme_name
+                await pilot.pause()
+                self.assertEqual(app.theme, theme_name)
             content = " ".join(
                 str(widget.content) for widget in app.screen.query(Static)
             )
@@ -223,6 +232,10 @@ class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn("Whisper Tiny", summary)
                 app.screen.query_one("#finish-setup", Button).press()
                 await pilot.pause()
+                self.assertIsInstance(app.screen, RuntimeModeScreen)
+                await pilot.click("#mode-desktop")
+                await pilot.click("#launch-runtime")
+                await pilot.pause()
 
         context = app.return_value
         self.assertIsInstance(context, Context)
@@ -236,6 +249,8 @@ class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
                 voice_id="whisper_tiny_ko",
             ),
         )
+        self.assertEqual(context.ui_theme, DEFAULT_UI_THEME)
+        self.assertIs(context.runtime_mode, RuntimeMode.DESKTOP)
         output_probe.assert_called_once()
         input_monitor.assert_called_once()
         recording_playback.assert_called_once()
@@ -295,8 +310,12 @@ class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIsInstance(app.screen, SummaryScreen)
                 app.screen.query_one("#finish-setup", Button).press()
                 await pilot.pause()
+                self.assertIsInstance(app.screen, RuntimeModeScreen)
+                await pilot.click("#launch-runtime")
+                await pilot.pause()
 
         self.assertIsInstance(app.return_value, Context)
+        self.assertIs(app.return_value.runtime_mode, RuntimeMode.CLASSIC)
         output_probe.assert_not_called()
         input_monitor.assert_not_called()
         camera_test.assert_not_called()
@@ -308,11 +327,12 @@ class StartupAppTests(unittest.IsolatedAsyncioTestCase):
             for step in STARTUP_STEPS:
                 report(StartupUpdate(step, f"{step} ready", finished=True))
 
-        app = StartupApp(prepare)
+        app = StartupApp(prepare, "monokai")
         async with app.run_test(size=(120, 40)) as pilot:
             await app.workers.wait_for_complete()
             await pilot.pause()
 
+            self.assertEqual(app.theme, "monokai")
             self.assertIsInstance(app.screen, StartupScreen)
             content = " ".join(
                 str(widget.content) for widget in app.screen.query(Static)

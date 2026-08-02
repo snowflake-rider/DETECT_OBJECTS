@@ -52,6 +52,7 @@ from ..opencv_preview.camera_preview import (
     CameraPreviewResult,
     launch_camera_preview,
 )
+from ..ui_theme import DEFAULT_UI_THEME, UI_THEME_OPTIONS
 
 
 def _step_rail(active: int) -> Static:
@@ -60,9 +61,9 @@ def _step_rail(active: int) -> Static:
     parts: list[str] = []
     for position, label in enumerate(labels, start=1):
         if position < active:
-            parts.append(f"[green]✓ {label}[/]")
+            parts.append(f"[$success]✓ {label}[/]")
         elif position == active:
-            parts.append(f"[bold #7dd3fc]● {label}[/]")
+            parts.append(f"[bold $accent]● {label}[/]")
         else:
             parts.append(f"[dim]○ {label}[/]")
     return Static("   ───   ".join(parts), classes="step-rail")
@@ -111,6 +112,14 @@ class WelcomeScreen(Screen[bool]):
                 "Four guided choices · about two minutes",
                 classes="hero-note",
             )
+            with Horizontal(classes="theme-picker"):
+                yield Label("TUI theme", classes="theme-label")
+                yield Select[str](
+                    UI_THEME_OPTIONS,
+                    allow_blank=False,
+                    value=DEFAULT_UI_THEME,
+                    id="ui-theme",
+                )
             with Vertical(classes="feature-list"):
                 with Horizontal(classes="feature-row"):
                     yield Digits("01", classes="feature-number")
@@ -147,6 +156,13 @@ class WelcomeScreen(Screen[bool]):
                 classes="primary-action",
             )
         yield Footer()
+
+    @on(Select.Changed, "#ui-theme")
+    def theme_changed(self) -> None:
+        """Apply the selected theme immediately to every setup screen."""
+        theme_name = self.query_one("#ui-theme", Select).selection
+        if theme_name is not None:
+            self.app.theme = theme_name
 
     @on(Button.Pressed, "#begin-setup")
     def begin_setup(self) -> None:
@@ -882,7 +898,7 @@ class SummaryScreen(Screen[Context]):
                         classes="summary-table-detail",
                     )
             yield Button(
-                "Start ODIA  →",
+                "Choose Runtime  →",
                 id="finish-setup",
                 variant="success",
                 classes="primary-action",
