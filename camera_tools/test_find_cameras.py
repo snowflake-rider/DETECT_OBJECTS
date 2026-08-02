@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import find_cameras
+# Import by package name so the tests run either from the project root
+# (``python -m unittest discover``) or from this directory.
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(ROOT))
+
+from camera_tools import find_cameras
 
 
 class FakeFrame:
@@ -131,6 +137,37 @@ class FindCamerasTests(unittest.TestCase):
         self.assertEqual([camera["index"] for camera in report["cameras"]], [1])
         self.assertEqual(report["cameras"][0]["width"], 1280)
         self.assertTrue(all(capture.released for capture in fake_cv2.captures))
+
+    def test_first_available_stops_at_the_first_usable_index(self) -> None:
+        fake_cv2 = FakeCV2(
+            {
+                1: {"opened": True, "reads": [(True, FakeFrame(480, 640))]},
+                2: {"opened": True, "reads": [(True, FakeFrame(480, 640))]},
+            }
+        )
+
+        with patch.object(find_cameras, "cv2", fake_cv2):
+            finder = find_cameras.CameraFinder(
+                max_index=5,
+                attempts=1,
+                retry_delay=0,
+                environment=environment("Darwin"),
+            )
+            index = finder.first_available()
+
+        self.assertEqual(index, 1)
+        # Indexes 0 and 1 only: probing must not continue past the first hit.
+        self.assertEqual(len(fake_cv2.captures), 2)
+
+    def test_first_available_without_cameras(self) -> None:
+        fake_cv2 = FakeCV2({})
+
+        with patch.object(find_cameras, "cv2", fake_cv2):
+            finder = find_cameras.CameraFinder(
+                max_index=2,
+                environment=environment("Linux"),
+            )
+            self.assertIsNone(finder.first_available())
 
     def test_invalid_range(self) -> None:
         with self.assertRaises(ValueError):

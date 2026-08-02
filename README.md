@@ -3,6 +3,29 @@
 OpenCV 카메라 영상에서 YOLO-World로 객체를 탐지하는 실험용 Python
 프로젝트입니다.
 
+## uv 환경 설정
+
+이 프로젝트는 Python 3.11을 사용합니다. `uv`가 설치되어 있다면 다음 명령으로
+프로젝트 전용 `.venv`를 만들고 잠긴 버전의 의존성을 설치할 수 있습니다.
+
+```bash
+uv sync --locked
+```
+
+환경을 직접 활성화하지 않고 실행하려면 각 명령 앞에 `uv run`을 붙입니다.
+
+```bash
+uv run python camera_cv/list_cameras.py
+uv run python camera_cv/camera_test.py
+uv run python camera_cv/camera.py --camera-index 0
+```
+
+셸에서 환경을 활성화하려면 다음 명령을 사용합니다.
+
+```bash
+source .venv/bin/activate
+```
+
 ## 주요 파일
 
 - `camera_cv/camera.py`: 카메라 영상을 받아 실시간 객체 탐지를 실행합니다.

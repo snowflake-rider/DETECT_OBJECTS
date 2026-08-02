@@ -158,6 +158,18 @@ class CameraFinder:
             # Release every probe before attempting to open the next index.
             capture.release()
 
+    def first_available(self) -> int | None:
+        """Return the lowest usable camera index, or ``None`` if there is none.
+
+        Probing stops at the first success, so callers that only need a camera
+        to open do not pay for the whole index range.
+        """
+        for index in range(self.start_index, self.max_index + 1):
+            if self._probe(index)["available"]:
+                return index
+
+        return None
+
     def scan(self) -> dict[str, Any]:
         """Probe the configured index range and return a report dictionary."""
         started = time.monotonic()
