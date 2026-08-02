@@ -32,9 +32,9 @@ miniconda_installer_name() {
     esac
 }
 
-# Keep Miniconda and its Python environment inside the project.
+# Keep Miniconda and the shared Conda environment inside the project.
 state_dir="${project_root}/.odia"
-conda_env_dir="${state_dir}/envs/miniconda"
+conda_env_dir="${state_dir}/envs/conda"
 miniconda_install_dir="${state_dir}/tools/miniconda3"
 conda_command="${miniconda_install_dir}/bin/conda"
 

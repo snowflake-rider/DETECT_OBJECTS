@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # Conda workflow:
-#   1. Find an existing Conda command.
+#   1. Use existing Conda, or install private Miniconda when it is missing.
 #   2. Create a local Python 3.11 environment if needed.
 #   3. Install dependencies and ODIA.
 #   4. Download models, verify the environment, and start ODIA.
@@ -21,11 +21,10 @@ conda_pkgs_dir="${state_dir}/caches/conda"
 pip_cache_dir="${state_dir}/caches/pip"
 conda_command="${ODIA_CONDA_COMMAND:-$(command -v conda || true)}"
 
-# -z is true when command -v could not find Conda.
+# If Conda is missing, let miniconda.sh install a private copy and return here.
 if [[ -z "${conda_command}" ]]; then
-    echo "Conda was not found." >&2
-    echo "Choose Miniconda with: ./bootstrap/setup.sh miniconda" >&2
-    exit 1
+    echo "Conda was not found; installing private Miniconda..."
+    exec "${bootstrap_dir}/managers/miniconda.sh"
 fi
 
 # Confirm that the discovered Conda command actually runs.

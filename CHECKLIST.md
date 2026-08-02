@@ -2,31 +2,30 @@
 
 ## Bootstrap
 
-- [ ] conda env portable
+- [ ] Conda choice portable
     - [ ] Mac
     - [ ] Windows
+    - [ ] Existing Conda path
+    - [ ] Private Miniconda fallback path
 - [ ] uv env portable
-    - [ ] Mac
-    - [ ] Windows
-- [ ] private Miniconda env portable
-    - [x] Mac — installation, imports, verification, and ODIA launch passed
+    - [x] Mac
     - [ ] Windows
 
 ### Tomorrow — Windows (2026-08-03)
 
 - [ ] Clone the `uv-env` branch on a Windows computer
-- [ ] Run `.\bootstrap\setup.ps1` from PowerShell
-- [ ] Check the arrow keys, Enter, number shortcuts, `Q`, and screen restoration
-- [ ] Choose `uv` and complete installation, model download, verification, and ODIA launch
-- [ ] Confirm generated environments, tools, and caches remain inside `.odia/`
-- [ ] Test the existing Conda and private Miniconda choices separately
-- [ ] Write down any Windows-specific errors or missing system requirements
+    - [ ] Run `.\bootstrap\setup.ps1` from PowerShell
+    - [ ] Check the arrow keys, Enter, number shortcuts, `Q`, and screen restoration
+    - [ ] Choose `uv` and complete installation, model download, verification, and ODIA launch
+    - [ ] Confirm generated environments, tools, and caches remain inside `.odia/`
+    - [ ] Test Conda with an existing installation and with the Miniconda fallback
+    - [ ] Write down any Windows-specific errors or missing system requirements
 
 ### Later — Linux
 
 - [ ] Run `./bootstrap/setup.sh` on a Linux computer
-- [ ] Test the `uv`, existing Conda, and private Miniconda choices
-- [ ] Confirm audio dependencies and ODIA device setup work on Linux
+- [ ] Test `uv` and Conda, including the Miniconda fallback
+    - [ ] Confirm audio dependencies and ODIA device setup work on Linux
 
 ## Distributed test at home
 

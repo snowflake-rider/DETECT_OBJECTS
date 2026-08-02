@@ -3,7 +3,7 @@ param(
     # The first optional argument can skip the menu:
     #   .\bootstrap\setup.ps1 uv
     [Parameter(Position = 0)]
-    [ValidateSet("uv", "conda", "miniconda")]
+    [ValidateSet("uv", "conda")]
     [string]$Manager
 )
 
@@ -40,8 +40,11 @@ function Choose-Manager {
         throw "Cannot open the menu. Choose directly: .\bootstrap\setup.ps1 uv"
     }
 
-    $Options = @("uv", "conda", "miniconda")
-    $Labels = @("⚡ uv (recommended)", "🐍 Conda", "📦 Miniconda")
+    $Options = @("uv", "conda")
+    $Labels = @(
+        "⚡️ uv          Locked and portable (recommended)",
+        "🐍 Conda       Installed automatically if missing"
+    )
     $SelectedIndex = 0
     $Escape = [char]27
 
@@ -54,6 +57,14 @@ function Choose-Manager {
             Write-Host "${Escape}[2J${Escape}[H" -NoNewline
             Write-Host "🛠️  ODIA setup (Windows)"
             Write-Host
+            Write-Host "Why uv is recommended:"
+            Write-Host "Portability: The same workflow works across supported operating systems."
+            Write-Host "Consistency: uv.lock keeps dependency versions consistent across computers."
+            Write-Host "Isolation: uv manages Python locally instead of using system Python."
+            Write-Host "Validation: uv sync --locked detects dependency changes before launch."
+            Write-Host
+            Write-Host "Python environments and packages stay under .odia/."
+            Write-Host
 
             for ($Index = 0; $Index -lt $Options.Count; $Index++) {
                 if ($Index -eq $SelectedIndex) {
@@ -65,7 +76,7 @@ function Choose-Manager {
             }
 
             Write-Host
-            Write-Host "Use ↑/↓ and Enter, or press 1-3. Press Q or Ctrl+C to cancel."
+            Write-Host "Use ↑/↓ and Enter, or press 1-2. Press Q or Ctrl+C to cancel."
 
             # Read one key immediately without displaying it.
             $Key = [Console]::ReadKey($true)
@@ -86,8 +97,6 @@ function Choose-Manager {
                 "NumPad1" { return "uv" }
                 "D2" { return "conda" }
                 "NumPad2" { return "conda" }
-                "D3" { return "miniconda" }
-                "NumPad3" { return "miniconda" }
                 "Q" { exit 130 }
             }
         }
@@ -318,12 +327,9 @@ switch ($Manager) {
     "conda" {
         $CondaCommand = Find-Conda
         if ($null -eq $CondaCommand) {
-            throw "Conda was not found. Choose Miniconda instead."
+            Write-Host "Conda was not found; installing private Miniconda..."
+            $CondaCommand = Install-Miniconda
         }
         Start-WithConda $CondaCommand (Join-Path $StateDir "envs\conda")
-    }
-    "miniconda" {
-        $CondaCommand = Install-Miniconda
-        Start-WithConda $CondaCommand (Join-Path $StateDir "envs\miniconda")
     }
 }
