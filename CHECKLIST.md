@@ -8,6 +8,9 @@
 - [ ] uv env portable
     - [ ] Mac
     - [ ] Windows
+- [ ] private Miniconda env portable
+    - [x] Mac — installation, imports, verification, and ODIA launch passed
+    - [ ] Windows
 
 ### Tomorrow — Windows (2026-08-03)
 
