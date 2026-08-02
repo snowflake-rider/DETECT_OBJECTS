@@ -26,11 +26,16 @@ from detect_objects.opencv_preview.camera_preview import (
     CameraPreviewMode,
     CameraPreviewResult,
 )
+from detect_objects.models import (
+    DEFAULT_VISION_MODEL_ID,
+    ModelSelection,
+)
 from detect_objects.tui.app import OdiaApp
 from detect_objects.tui.device_setup_screen import (
     AudioInputScreen,
     AudioOutputScreen,
     CameraScreen,
+    ModelSelectionScreen,
     SummaryScreen,
     WelcomeScreen,
 )
@@ -73,11 +78,12 @@ class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("DEVICE SETUP", content)
             self.assertIn("hear, speak, and be seen", content)
             numbers = [str(widget.value) for widget in app.screen.query(Digits)]
-            self.assertEqual(numbers, ["01", "02", "03"])
+            self.assertEqual(numbers, ["01", "02", "03", "04"])
             labels = " ".join(str(widget.content) for widget in app.screen.query(Label))
             self.assertIn("AUDIO OUTPUT", labels)
             self.assertIn("AUDIO INPUT", labels)
             self.assertIn("VIDEO INPUT", labels)
+            self.assertIn("AI MODELS", labels)
             self.assertIsNotNone(app.screen.query_one("#begin-setup", Button))
 
     async def test_completes_output_input_camera_and_summary_flow(self) -> None:
@@ -123,9 +129,9 @@ class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIsInstance(app.screen, AudioOutputScreen)
                 output_next = app.screen.query_one("#next-output", Button)
                 self.assertTrue(output_next.disabled)
-                app.screen.query_one(
-                    "#audio-output", Select
-                ).value = self.audio_output.index
+                app.screen.query_one("#audio-output", Select).value = (
+                    self.audio_output.index
+                )
                 await pilot.pause()
                 await pilot.click("#play-output-sample")
                 await app.workers.wait_for_complete()
@@ -140,9 +146,9 @@ class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
 
                 self.assertIsInstance(app.screen, AudioInputScreen)
                 input_next = app.screen.query_one("#next-input", Button)
-                app.screen.query_one(
-                    "#audio-input", Select
-                ).value = self.audio_input.index
+                app.screen.query_one("#audio-input", Select).value = (
+                    self.audio_input.index
+                )
                 await pilot.pause()
                 await pilot.click("#monitor-input")
                 await pilot.pause(0.1)
@@ -192,6 +198,15 @@ class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
                 await pilot.click("#next-camera")
                 await pilot.pause()
 
+                self.assertIsInstance(app.screen, ModelSelectionScreen)
+                vision_select = app.screen.query_one("#vision-model", Select)
+                voice_select = app.screen.query_one("#voice-model", Select)
+                self.assertEqual(vision_select.selection, DEFAULT_VISION_MODEL_ID)
+                voice_select.value = "whisper_tiny_ko"
+                await pilot.pause()
+                await pilot.click("#next-models")
+                await pilot.pause()
+
                 self.assertIsInstance(app.screen, SummaryScreen)
                 summary = " ".join(
                     str(widget.content) for widget in app.screen.query(Static)
@@ -199,7 +214,9 @@ class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn(self.audio_output.name, summary)
                 self.assertIn(self.audio_input.name, summary)
                 self.assertIn(self.camera.name, summary)
-                await pilot.click("#finish-setup")
+                self.assertIn("YOLO-World v2 Small", summary)
+                self.assertIn("Whisper Tiny", summary)
+                app.screen.query_one("#finish-setup", Button).press()
                 await pilot.pause()
 
         context = app.return_value
@@ -207,6 +224,13 @@ class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(context.audio_output.info, self.audio_output)
         self.assertIs(context.audio_input.info, self.audio_input)
         self.assertIs(context.camera.info, self.camera)
+        self.assertEqual(
+            context.models,
+            ModelSelection(
+                vision_id=DEFAULT_VISION_MODEL_ID,
+                voice_id="whisper_tiny_ko",
+            ),
+        )
         output_probe.assert_called_once()
         input_monitor.assert_called_once()
         recording_playback.assert_called_once()
@@ -216,6 +240,61 @@ class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
             modes,
             [CameraPreviewMode.SNAPSHOT, CameraPreviewMode.STREAM],
         )
+
+    async def test_can_skip_optional_device_tests(self) -> None:
+        with (
+            patch.object(AudioOutput, "list_devices", return_value=[self.audio_output]),
+            patch.object(AudioInput, "list_devices", return_value=[self.audio_input]),
+            patch.object(Camera, "list_devices", return_value=[self.camera]),
+            patch(
+                "detect_objects.tui.device_setup_screen.probe_audio_output"
+            ) as output_probe,
+            patch(
+                "detect_objects.tui.device_setup_screen.monitor_and_record"
+            ) as input_monitor,
+            patch(
+                "detect_objects.tui.device_setup_screen.launch_camera_preview"
+            ) as camera_test,
+        ):
+            app = OdiaApp()
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                await pilot.click("#begin-setup")
+                await pilot.pause()
+
+                app.screen.query_one("#audio-output", Select).value = (
+                    self.audio_output.index
+                )
+                await pilot.pause()
+                self.assertFalse(app.screen.query_one("#next-output", Button).disabled)
+                await pilot.click("#next-output")
+                await pilot.pause()
+
+                app.screen.query_one("#audio-input", Select).value = (
+                    self.audio_input.index
+                )
+                await pilot.pause()
+                self.assertFalse(app.screen.query_one("#next-input", Button).disabled)
+                await pilot.click("#next-input")
+                await pilot.pause()
+
+                app.screen.query_one("#camera-input", Select).value = self.camera.index
+                await pilot.pause()
+                self.assertFalse(app.screen.query_one("#next-camera", Button).disabled)
+                await pilot.click("#next-camera")
+                await pilot.pause()
+
+                self.assertIsInstance(app.screen, ModelSelectionScreen)
+                await pilot.click("#next-models")
+                await pilot.pause()
+                self.assertIsInstance(app.screen, SummaryScreen)
+                app.screen.query_one("#finish-setup", Button).press()
+                await pilot.pause()
+
+        self.assertIsInstance(app.return_value, Context)
+        output_probe.assert_not_called()
+        input_monitor.assert_not_called()
+        camera_test.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -5,10 +5,12 @@ from __future__ import annotations
 from textual.app import App
 
 from ..device_setup import AudioInput, AudioOutput, Camera, Context
+from ..models import ModelSelection
 from .device_setup_screen import (
     AudioInputScreen,
     AudioOutputScreen,
     CameraScreen,
+    ModelSelectionScreen,
     SetupSession,
     SummaryScreen,
     WelcomeScreen,
@@ -69,61 +71,85 @@ class OdiaApp(App[Context | None]):
         color: $accent;
     }
 
-    .feature-grid {
-        layout: grid;
-        grid-size: 3 1;
-        grid-gutter: 0 2;
-        width: 100%;
-        height: 10;
-        margin: 2 0;
-    }
-
-    .summary-grid {
+    .feature-list {
         width: 100%;
         height: auto;
         margin: 2 0;
     }
 
-    .feature {
+    .feature-row {
         width: 100%;
-        height: 100%;
-        padding: 0 2 1 2;
-        border: round $primary;
+        height: 4;
+        margin-bottom: 1;
+        padding: 0 2;
+        border-left: thick $primary;
         background: $boost;
-        text-align: center;
+        align: left middle;
     }
 
     .feature-number {
-        width: 100%;
+        width: 8;
         height: 3;
         color: $accent;
-        text-align: center;
+        text-align: left;
     }
 
     .feature-title {
-        width: 100%;
+        width: 22;
         height: 1;
         color: $text;
         text-style: bold;
-        text-align: center;
+        text-align: left;
     }
 
     .feature-copy {
-        width: 100%;
-        height: auto;
-        margin-top: 1;
-        color: $text-muted;
-        text-align: center;
-    }
-
-    .summary-device {
         width: 1fr;
         height: auto;
-        margin: 0 1;
-        padding: 1 2;
+        color: $text-muted;
+        text-align: left;
+    }
+
+    .summary-table {
+        width: 100%;
+        height: auto;
+        margin: 2 0;
         border: round $primary;
         background: $boost;
-        text-align: center;
+    }
+
+    .summary-table-header, .summary-table-row {
+        width: 100%;
+        height: 3;
+        padding: 1 2 0 2;
+        align: left middle;
+    }
+
+    .summary-table-header {
+        color: $text-muted;
+        text-style: bold;
+        border-bottom: solid $primary;
+    }
+
+    .summary-table-row {
+        border-bottom: solid $surface;
+    }
+
+    .summary-table-label {
+        width: 22;
+        color: $accent;
+        text-style: bold;
+    }
+
+    .summary-table-value {
+        width: 1fr;
+        color: $text;
+        text-style: bold;
+    }
+
+    .summary-table-detail {
+        width: 24;
+        color: $text-muted;
+        text-align: right;
     }
 
     .step-rail {
@@ -132,7 +158,7 @@ class OdiaApp(App[Context | None]):
         margin-bottom: 2;
     }
 
-    .eyebrow, .summary-label {
+    .eyebrow {
         color: $accent;
         text-style: bold;
     }
@@ -157,6 +183,13 @@ class OdiaApp(App[Context | None]):
         padding: 1 2;
         border-left: thick $accent;
         background: $boost;
+    }
+
+    .model-description {
+        width: 100%;
+        height: auto;
+        margin: -1 0 1 0;
+        color: $text-muted;
     }
 
     .field-label {
@@ -222,26 +255,6 @@ class OdiaApp(App[Context | None]):
         text-align: center;
     }
 
-    .summary-name {
-        width: 100%;
-        min-height: 2;
-        margin-top: 1;
-        text-style: bold;
-        text-align: center;
-    }
-
-    .summary-detail {
-        width: 100%;
-        color: $text-muted;
-        text-align: center;
-    }
-
-    .verified {
-        width: 100%;
-        margin-top: 1;
-        color: $success;
-        text-align: center;
-    }
     """
 
     BINDINGS = [("q", "quit", "Quit")]
@@ -271,6 +284,10 @@ class OdiaApp(App[Context | None]):
 
     def _camera_finished(self, camera: Camera) -> None:
         self.session.camera = camera
+        self.push_screen(ModelSelectionScreen(), self._models_finished)
+
+    def _models_finished(self, models: ModelSelection) -> None:
+        self.session.models = models
         self.push_screen(SummaryScreen(self.session), self.finish_device_setup)
 
     def finish_device_setup(self, context: Context) -> None:
@@ -292,6 +309,8 @@ def main() -> int:
     print(f"Camera: {context.camera.info.name}")
     print(f"Audio input: {context.audio_input.info.name}")
     print(f"Audio output: {context.audio_output.info.name}")
+    print(f"Vision model: {context.models.vision_id}")
+    print(f"Voice model: {context.models.voice_id}")
     return 0
 
 

@@ -11,8 +11,13 @@ import platform
 import threading
 import queue
 import time
+from typing import TYPE_CHECKING
 
-from ..models.yolo_world_module import YOLO_World_Manager
+from ..models import DEFAULT_VISION_MODEL_ID
+from ..models.factory import create_vision_manager
+
+if TYPE_CHECKING:
+    from ..models.yolo_world_module import YOLO_World_Manager
 
 
 class Camera_Manager:
@@ -25,6 +30,7 @@ class Camera_Manager:
         class_names_queue: queue.Queue[tuple[list[str], float]] | None = None,
         supported_classes: list[str] | None = None,
         camera_backend: int | None = None,
+        vision_model_id: str = DEFAULT_VISION_MODEL_ID,
     ):
         """Open the requested camera and configure detectable classes."""
         # Camera indexes depend on the computer and its connected devices, so
@@ -44,8 +50,9 @@ class Camera_Manager:
             "person",
         ]
         self.__supported_classes = supported_classes or self.__classes
+        self.__vision_model_id = vision_model_id
         self.__thread_event = thread_event or threading.Event()
-        self.__yolo_world_manager: YOLO_World_Manager = None
+        self.__yolo_world_manager: YOLO_World_Manager | None = None
         self.__class_names_queue = class_names_queue
 
     def _select_backend(self) -> int:
@@ -62,7 +69,7 @@ class Camera_Manager:
     # Yolo world model
     def load_model(self):
         try:
-            self.__yolo_world_manager = YOLO_World_Manager()
+            self.__yolo_world_manager = create_vision_manager(self.__vision_model_id)
             self.__yolo_world_manager.load()
             self.__yolo_world_manager.cache_class_embeddings(self.__supported_classes)
             self.__yolo_world_manager.activate_cached_classes(self.__classes)

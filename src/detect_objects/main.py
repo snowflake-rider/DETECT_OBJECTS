@@ -4,6 +4,7 @@ import traceback
 import time
 
 from .camera_cv.camera_cv import Camera_Manager
+from .models.factory import create_voice_manager
 from .tui.app import run_app
 from .voice_text_convert.mic_whisper_manager import Whisper_Audio_Manager
 from .voice_text_convert.parse_and_match_module import Text_Manager
@@ -29,7 +30,11 @@ def put_latest_classes(class_names: list[str]) -> None:
         class_names_queue.put_nowait((class_names, requested_at))
 
 
-def detecting_objects(supported_classes: list[str], camera):
+def detecting_objects(
+    supported_classes: list[str],
+    camera,
+    vision_model_id: str,
+):
     try:
         camera_manager = Camera_Manager(
             camera_index=camera.info.index,
@@ -37,6 +42,7 @@ def detecting_objects(supported_classes: list[str], camera):
             thread_event=stop_event,
             class_names_queue=class_names_queue,
             supported_classes=supported_classes,
+            vision_model_id=vision_model_id,
         )
         camera_manager.load_model()
 
@@ -135,14 +141,9 @@ def main() -> int:
         with Text_Manager() as text_manager:
             supported_classes = text_manager.get_supported_yolo_classes()
 
-        whisper_audio_manager = Whisper_Audio_Manager(
+        whisper_audio_manager = create_voice_manager(
+            context.models.voice_id,
             device_id=device_id,
-            model_name="base",
-            sample_rate=16000,
-            channels=1,
-            block_size=1024,
-            record_seconds=5,
-            language="ko",
         )
 
         voice_to_text_thread = threading.Thread(
@@ -152,7 +153,11 @@ def main() -> int:
             daemon=True,
         )
         voice_to_text_thread.start()
-        detecting_objects(supported_classes, context.camera)
+        detecting_objects(
+            supported_classes,
+            context.camera,
+            context.models.vision_id,
+        )
     except KeyboardInterrupt:
         print("종료 요청을 받았습니다.")
     finally:

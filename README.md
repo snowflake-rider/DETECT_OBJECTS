@@ -47,6 +47,9 @@ source odia-uv/bin/activate
 - `src/detect_objects/tui/`: Textual 장치 선택 화면과 애플리케이션 셸을 제공합니다.
 - `__archived/cli/`: 이전 Rich 기반 장치 설정 인터페이스를 보존합니다.
 - `src/detect_objects/models/device_selector.py`: MPS, CUDA, CPU 순으로 추론 장치를 선택합니다.
+- `src/detect_objects/models/catalog.py`: TUI에 표시할 비전 및 음성 모델 프리셋과 기본 선택을
+  정의합니다.
+- `src/detect_objects/models/factory.py`: 선택된 프리셋 ID를 실제 런타임 모델 관리자로 변환합니다.
 - `src/detect_objects/models/model_config.py`: `config/models.toml`을 읽고 모델 설정과 가중치
   경로를 검증합니다.
 - `src/detect_objects/models/yolo_world_module.py`: YOLO-World 모델의 로딩, 추론, 해제를 관리합니다.
@@ -106,17 +109,19 @@ Textual 장치 설정 마법사를 실행하려면 다음 명령을 사용합니
 python -m detect_objects.tui.app
 ```
 
-마법사는 오디오 출력, 오디오 입력, 비디오 입력 순서로 진행됩니다. 먼저 출력
+마법사는 오디오 출력, 오디오 입력, 비디오 입력, AI 모델 선택 순서로 진행됩니다. 먼저 출력
 장치를 선택하고 고양이 울음 샘플을 들은 뒤 정상 재생 여부를 확인합니다. 다음으로
 마이크를 선택하고 `Monitor`를 누른 뒤 "Hello"라고 말합니다. 녹음하는 동안
 진행 막대와 dB 값이 실시간으로 갱신됩니다. `Done`으로 녹음을 끝낸 뒤
 `Playback`을 눌러 선택한 출력 장치로 녹음을 확인합니다.
 
-비디오 입력 단계에서는 `Start Camera Test`로 정지 이미지를 먼저 확인합니다.
+각 장치 테스트는 선택 사항이며 이미 정상 동작을 알고 있다면 장치를 선택한 뒤
+바로 다음 단계로 진행할 수 있습니다. 비디오 입력 단계에서는 `Start Camera Test`로 정지 이미지를 먼저 확인합니다.
 이 테스트가 성공하면 `Start Streaming Test`가 활성화되어 실시간 영상을 별도로
-확인할 수 있습니다. 각 OpenCV 창은 `q` 또는 Escape로 닫습니다. 두 테스트를 모두
-마치고 사용자가 확인해야 다음 단계가 활성화되며 마지막 화면에 선택한 장치
-이름이 대시보드로 표시됩니다.
+확인할 수 있습니다. 각 OpenCV 창은 `q` 또는 Escape로 닫습니다. AI 모델 단계에서는 기본
+비전 모델인 YOLO-World v2 Small과 기본 음성 모델인 Whisper Base Korean을
+선택하거나 제공되는 다른 프리셋으로 바꿀 수 있습니다. 마지막 화면에는 선택한
+장치와 모델이 함께 표시됩니다.
 
 카메라가 검색되지 않으면 다른 애플리케이션이 카메라를 사용 중인지 확인하고,
 운영체제 설정에서 터미널 또는 Python에 카메라 접근 권한이 허용되어 있는지

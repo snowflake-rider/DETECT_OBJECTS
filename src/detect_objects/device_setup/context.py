@@ -3,9 +3,10 @@
 # Delay reading type hints, so device modules are not loaded at runtime here.
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from ..models.catalog import ModelSelection
 from .environment import Environment
 
 # TYPE_CHECKING is False while Python runs, so these imports are skipped.
@@ -24,3 +25,4 @@ class Context:
     camera: Camera
     audio_input: AudioInput
     audio_output: AudioOutput
+    models: ModelSelection = field(default_factory=ModelSelection)

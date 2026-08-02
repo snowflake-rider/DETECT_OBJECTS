@@ -14,6 +14,7 @@ dependencies = [
     "ipykernel>=7.3.0",
     "mlx-audio==0.4.6; sys_platform == 'darwin' and platform_machine == 'arm64'",
     "numpy>=2.4.6",
+    "ollama>=0.6.2",
     "openai-whisper==20250625",
     "opencv-python==5.0.0.93",
     "pandas>=3.0.5",
@@ -41,4 +42,7 @@ where = ["src"]
 [dependency-groups]
 dev = [
     "black==26.5.1",
+    "jupyterlab>=4.4",
+    "nbclient>=0.10",
+    "nbformat>=5.10",
 ]

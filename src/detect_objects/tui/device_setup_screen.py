@@ -8,7 +8,7 @@ from threading import Event
 import sounddevice as sd
 from textual import on, work
 from textual.app import ComposeResult
-from textual.containers import Grid, Horizontal, Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.screen import Screen
 from textual.widgets import (
@@ -40,6 +40,13 @@ from ..device_setup import (
     play_recording,
     probe_audio_output,
 )
+from ..models import (
+    DEFAULT_VISION_MODEL_ID,
+    DEFAULT_VOICE_MODEL_ID,
+    ModelSelection,
+    get_model_option,
+    list_model_options,
+)
 from ..opencv_preview.camera_preview import (
     CameraPreviewMode,
     CameraPreviewResult,
@@ -49,7 +56,7 @@ from ..opencv_preview.camera_preview import (
 
 def _step_rail(active: int) -> Static:
     """Build a compact visual indicator for the sequential setup steps."""
-    labels = ("OUTPUT", "INPUT", "VIDEO", "READY")
+    labels = ("OUTPUT", "INPUT", "VIDEO", "MODELS", "READY")
     parts: list[str] = []
     for position, label in enumerate(labels, start=1):
         if position < active:
@@ -68,16 +75,23 @@ class SetupSession:
     audio_output: AudioOutput | None = None
     audio_input: AudioInput | None = None
     camera: Camera | None = None
+    models: ModelSelection | None = None
 
     def build_context(self) -> Context:
         """Create the runtime context after every device is confirmed."""
-        if self.audio_output is None or self.audio_input is None or self.camera is None:
+        if (
+            self.audio_output is None
+            or self.audio_input is None
+            or self.camera is None
+            or self.models is None
+        ):
             raise RuntimeError("Device setup is incomplete.")
         return Context(
             environment=Environment.detect(),
             camera=self.camera,
             audio_input=self.audio_input,
             audio_output=self.audio_output,
+            models=self.models,
         )
 
 
@@ -94,24 +108,38 @@ class WelcomeScreen(Screen[bool]):
                 classes="hero-copy",
             )
             yield Static(
-                "Three quick guided checks · about two minutes",
+                "Four guided choices · about two minutes",
                 classes="hero-note",
             )
-            with Grid(classes="feature-grid"):
-                with Vertical(classes="feature"):
+            with Vertical(classes="feature-list"):
+                with Horizontal(classes="feature-row"):
                     yield Digits("01", classes="feature-number")
                     yield Label("AUDIO OUTPUT", classes="feature-title")
                     yield Static(
-                        "Choose and test\nyour speakers", classes="feature-copy"
+                        "Speakers · optional test",
+                        classes="feature-copy",
                     )
-                with Vertical(classes="feature"):
+                with Horizontal(classes="feature-row"):
                     yield Digits("02", classes="feature-number")
                     yield Label("AUDIO INPUT", classes="feature-title")
-                    yield Static("Record and hear\nyourself", classes="feature-copy")
-                with Vertical(classes="feature"):
+                    yield Static(
+                        "Microphone · optional test",
+                        classes="feature-copy",
+                    )
+                with Horizontal(classes="feature-row"):
                     yield Digits("03", classes="feature-number")
                     yield Label("VIDEO INPUT", classes="feature-title")
-                    yield Static("Snapshot and\nlive preview", classes="feature-copy")
+                    yield Static(
+                        "Camera · optional test",
+                        classes="feature-copy",
+                    )
+                with Horizontal(classes="feature-row"):
+                    yield Digits("04", classes="feature-number")
+                    yield Label("AI MODELS", classes="feature-title")
+                    yield Static(
+                        "Vision and voice models",
+                        classes="feature-copy",
+                    )
             yield Button(
                 "Begin Setup  →",
                 id="begin-setup",
@@ -146,7 +174,7 @@ class AudioOutputScreen(Screen[AudioOutput]):
             yield Static("01 / AUDIO OUTPUT", classes="eyebrow")
             yield Static("Where should ODIA play sound?", classes="wizard-title")
             yield Static(
-                "Choose an output, then listen for the five-second cat meow sample.",
+                "Choose an output and continue, or optionally play the cat sample.",
                 classes="wizard-copy",
             )
             yield Label("Audio output", classes="field-label")
@@ -209,7 +237,7 @@ class AudioOutputScreen(Screen[AudioOutput]):
         self.query_one("#play-output-sample", Button).disabled = (
             selection is None or self._busy
         )
-        self.query_one("#next-output", Button).disabled = True
+        self.query_one("#next-output", Button).disabled = selection is None
         if selection is not None:
             self.query_one("#output-status", Static).update(
                 "Ready to play the cat sample."
@@ -223,6 +251,7 @@ class AudioOutputScreen(Screen[AudioOutput]):
         self._busy = True
         self.query_one("#audio-output", Select).disabled = True
         self.query_one("#play-output-sample", Button).disabled = True
+        self.query_one("#next-output", Button).disabled = True
         self.query_one("#output-status", Static).update("Playing cat meow…")
         self.run_output_sample(AudioOutput(self.outputs[output_index]))
 
@@ -235,6 +264,7 @@ class AudioOutputScreen(Screen[AudioOutput]):
         self._busy = False
         self.query_one("#audio-output", Select).disabled = False
         self.query_one("#play-output-sample", Button).disabled = False
+        self.query_one("#next-output", Button).disabled = False
         if message.result.available:
             self._sample_played = True
             self.query_one("#confirm-output", Checkbox).disabled = False
@@ -248,10 +278,7 @@ class AudioOutputScreen(Screen[AudioOutput]):
 
     @on(Checkbox.Changed, "#confirm-output")
     def output_confirmation_changed(self) -> None:
-        confirmed = self.query_one("#confirm-output", Checkbox).value
-        self.query_one("#next-output", Button).disabled = not (
-            self._sample_played and confirmed
-        )
+        """Retain confirmation as feedback without gating navigation."""
 
     @on(Button.Pressed, "#next-output")
     def finish_output(self) -> None:
@@ -299,7 +326,7 @@ class AudioInputScreen(Screen[AudioInput]):
                 classes="device-badge",
             )
             yield Static(
-                "Monitor while saying “Hello”, stop the recording, then play it back.",
+                "Choose an input and continue, or optionally record and play it back.",
                 classes="wizard-copy",
             )
             yield Label("Audio input", classes="field-label")
@@ -362,7 +389,7 @@ class AudioInputScreen(Screen[AudioInput]):
         selection = self.query_one("#audio-input", Select).selection
         self.query_one("#monitor-input", Button).disabled = selection is None
         self.query_one("#play-recording", Button).disabled = True
-        self.query_one("#next-input", Button).disabled = True
+        self.query_one("#next-input", Button).disabled = selection is None
         if selection is not None:
             self.query_one("#input-status", Static).update(
                 "Ready. Choose Monitor and say “Hello”."
@@ -432,6 +459,7 @@ class AudioInputScreen(Screen[AudioInput]):
         self.query_one("#monitor-input", Button).label = "Record Again"
         self.query_one("#monitor-input", Button).disabled = False
         self.query_one("#input-level", ProgressBar).display = False
+        self.query_one("#next-input", Button).disabled = False
 
         if message.result.successful and message.result.recording is not None:
             self._recording = message.result.recording
@@ -454,6 +482,7 @@ class AudioInputScreen(Screen[AudioInput]):
         self.query_one("#audio-input", Select).disabled = True
         self.query_one("#monitor-input", Button).disabled = True
         self.query_one("#play-recording", Button).disabled = True
+        self.query_one("#next-input", Button).disabled = True
         self.query_one("#input-status", Static).update("Playing your recording…")
         self.run_recording_playback(self._recording)
 
@@ -468,6 +497,7 @@ class AudioInputScreen(Screen[AudioInput]):
         self.query_one("#audio-input", Select).disabled = False
         self.query_one("#monitor-input", Button).disabled = False
         self.query_one("#play-recording", Button).disabled = False
+        self.query_one("#next-input", Button).disabled = False
         if message.result.successful:
             self._playback_succeeded = True
             self.query_one("#confirm-input", Checkbox).disabled = False
@@ -481,10 +511,7 @@ class AudioInputScreen(Screen[AudioInput]):
 
     @on(Checkbox.Changed, "#confirm-input")
     def input_confirmation_changed(self) -> None:
-        confirmed = self.query_one("#confirm-input", Checkbox).value
-        self.query_one("#next-input", Button).disabled = not (
-            self._playback_succeeded and confirmed
-        )
+        """Retain confirmation as feedback without gating navigation."""
 
     @on(Button.Pressed, "#next-input")
     def finish_input(self) -> None:
@@ -524,7 +551,7 @@ class CameraScreen(Screen[Camera]):
             yield Static("03 / VIDEO INPUT", classes="eyebrow")
             yield Static("Can ODIA see the right view?", classes="wizard-title")
             yield Static(
-                "First verify a still image, then test the live video stream.",
+                "Choose a camera and continue, or optionally test its image and stream.",
                 classes="wizard-copy",
             )
             yield Label("Video input", classes="field-label")
@@ -590,7 +617,7 @@ class CameraScreen(Screen[Camera]):
             selection is None or self._busy
         )
         self.query_one("#test-camera-stream", Button).disabled = True
-        self.query_one("#next-camera", Button).disabled = True
+        self.query_one("#next-camera", Button).disabled = selection is None
         if selection is not None:
             self.query_one("#camera-status", Static).update(
                 "Ready. Start with the camera test."
@@ -649,6 +676,7 @@ class CameraScreen(Screen[Camera]):
         self.query_one("#test-camera-stream", Button).disabled = not (
             self._camera_test_succeeded
         )
+        self.query_one("#next-camera", Button).disabled = False
         if message.result.successful:
             if message.mode is CameraPreviewMode.SNAPSHOT:
                 self._camera_test_succeeded = True
@@ -672,16 +700,107 @@ class CameraScreen(Screen[Camera]):
 
     @on(Checkbox.Changed, "#confirm-camera")
     def camera_confirmation_changed(self) -> None:
-        confirmed = self.query_one("#confirm-camera", Checkbox).value
-        self.query_one("#next-camera", Button).disabled = not (
-            self._camera_test_succeeded and self._streaming_test_succeeded and confirmed
-        )
+        """Retain confirmation as feedback without gating navigation."""
 
     @on(Button.Pressed, "#next-camera")
     def finish_camera(self) -> None:
         camera_index = self.query_one("#camera-input", Select).selection
         if camera_index is not None:
             self.dismiss(Camera(self.cameras[camera_index]))
+
+
+class ModelSelectionScreen(Screen[ModelSelection]):
+    """Choose the vision and voice model presets for this run."""
+
+    def compose(self) -> ComposeResult:
+        vision_options = list_model_options("vision")
+        voice_options = list_model_options("voice")
+
+        yield Header()
+        with VerticalScroll(classes="wizard-card"):
+            yield _step_rail(4)
+            yield Static("04 / AI MODELS", classes="eyebrow")
+            yield Static("How should ODIA see and listen?", classes="wizard-title")
+            yield Static(
+                "Choose model presets for this session. Recommended defaults are "
+                "selected automatically.",
+                classes="wizard-copy",
+            )
+
+            yield Label("Vision model", classes="field-label")
+            yield Select[str](
+                [(option.display_name, option.id) for option in vision_options],
+                allow_blank=False,
+                value=DEFAULT_VISION_MODEL_ID,
+                id="vision-model",
+            )
+            yield Static(
+                get_model_option(DEFAULT_VISION_MODEL_ID).description,
+                id="vision-model-description",
+                classes="model-description",
+            )
+
+            yield Label("Voice model", classes="field-label")
+            yield Select[str](
+                [(option.display_name, option.id) for option in voice_options],
+                allow_blank=False,
+                value=DEFAULT_VOICE_MODEL_ID,
+                id="voice-model",
+            )
+            yield Static(
+                get_model_option(DEFAULT_VOICE_MODEL_ID).description,
+                id="voice-model-description",
+                classes="model-description",
+            )
+
+            yield Button(
+                "Review Setup  →",
+                id="next-models",
+                variant="primary",
+                classes="primary-action",
+            )
+        yield Footer()
+
+    @on(Select.Changed, "#vision-model")
+    def vision_model_changed(self) -> None:
+        model_id = self.query_one("#vision-model", Select).selection
+        if model_id is not None:
+            option = get_model_option(model_id, kind="vision")
+            self.query_one("#vision-model-description", Static).update(
+                option.description
+            )
+        self._update_next_button()
+
+    @on(Select.Changed, "#voice-model")
+    def voice_model_changed(self) -> None:
+        model_id = self.query_one("#voice-model", Select).selection
+        if model_id is not None:
+            option = get_model_option(model_id, kind="voice")
+            self.query_one("#voice-model-description", Static).update(
+                option.description
+            )
+        self._update_next_button()
+
+    def _update_next_button(self) -> None:
+        vision_id = self.query_one("#vision-model", Select).selection
+        voice_id = self.query_one("#voice-model", Select).selection
+        self.query_one("#next-models", Button).disabled = (
+            vision_id is None or voice_id is None
+        )
+
+    @on(Button.Pressed, "#next-models")
+    def finish_models(self) -> None:
+        vision_id = self.query_one("#vision-model", Select).selection
+        voice_id = self.query_one("#voice-model", Select).selection
+        if vision_id is None or voice_id is None:
+            return
+
+        self.dismiss(
+            ModelSelection(
+                vision_id=vision_id,
+                voice_id=voice_id,
+            )
+        )
 
 
 class SummaryScreen(Screen[Context]):
@@ -696,47 +815,74 @@ class SummaryScreen(Screen[Context]):
             self.session.audio_output is None
             or self.session.audio_input is None
             or self.session.camera is None
+            or self.session.models is None
         ):
             raise RuntimeError("Cannot show a summary for incomplete setup.")
 
         output = self.session.audio_output.info
         audio_input = self.session.audio_input.info
         camera = self.session.camera.info
+        vision_model = get_model_option(
+            self.session.models.vision_id,
+            kind="vision",
+        )
+        voice_model = get_model_option(
+            self.session.models.voice_id,
+            kind="voice",
+        )
 
         yield Header()
         with VerticalScroll(classes="wizard-card summary-card"):
-            yield _step_rail(4)
+            yield _step_rail(5)
             yield Static("✓", classes="success-mark")
-            yield Static("Devices Ready", classes="wizard-title summary-title")
+            yield Static("ODIA Ready", classes="wizard-title summary-title")
             yield Static(
-                "Your verified selections are ready for this session.",
+                "Your verified devices and model presets are ready for this session.",
                 classes="wizard-copy",
             )
-            with Horizontal(classes="summary-grid"):
-                with Vertical(classes="summary-device"):
-                    yield Static("🔊  AUDIO OUTPUT", classes="summary-label")
-                    yield Static(output.name, classes="summary-name")
+            with Vertical(classes="summary-table"):
+                with Horizontal(classes="summary-table-header"):
+                    yield Static("SETUP", classes="summary-table-label")
+                    yield Static("SELECTION", classes="summary-table-value")
+                    yield Static("DETAIL", classes="summary-table-detail")
+                with Horizontal(classes="summary-table-row"):
+                    yield Static("✓  AUDIO OUTPUT", classes="summary-table-label")
+                    yield Static(output.name, classes="summary-table-value")
                     yield Static(
                         f"{output.channels} ch · {output.samplerate / 1000:g} kHz",
-                        classes="summary-detail",
+                        classes="summary-table-detail",
                     )
-                    yield Static("✓ Confirmed", classes="verified")
-                with Vertical(classes="summary-device"):
-                    yield Static("🎙  AUDIO INPUT", classes="summary-label")
-                    yield Static(audio_input.name, classes="summary-name")
+                with Horizontal(classes="summary-table-row"):
+                    yield Static("✓  AUDIO INPUT", classes="summary-table-label")
+                    yield Static(audio_input.name, classes="summary-table-value")
                     yield Static(
                         f"{audio_input.channels} ch · "
                         f"{audio_input.samplerate / 1000:g} kHz",
-                        classes="summary-detail",
+                        classes="summary-table-detail",
                     )
-                    yield Static("✓ Confirmed", classes="verified")
-                with Vertical(classes="summary-device"):
-                    yield Static("📷  VIDEO INPUT", classes="summary-label")
-                    yield Static(camera.name, classes="summary-name")
-                    yield Static("Snapshot · Live stream", classes="summary-detail")
-                    yield Static("✓ Confirmed", classes="verified")
+                with Horizontal(classes="summary-table-row"):
+                    yield Static("✓  VIDEO INPUT", classes="summary-table-label")
+                    yield Static(camera.name, classes="summary-table-value")
+                    yield Static(
+                        "Snapshot · Stream",
+                        classes="summary-table-detail",
+                    )
+                with Horizontal(classes="summary-table-row"):
+                    yield Static("✓  VISION MODEL", classes="summary-table-label")
+                    yield Static(vision_model.name, classes="summary-table-value")
+                    yield Static(
+                        "Recommended" if vision_model.recommended else "Selected",
+                        classes="summary-table-detail",
+                    )
+                with Horizontal(classes="summary-table-row"):
+                    yield Static("✓  VOICE MODEL", classes="summary-table-label")
+                    yield Static(voice_model.name, classes="summary-table-value")
+                    yield Static(
+                        "Recommended" if voice_model.recommended else "Selected",
+                        classes="summary-table-detail",
+                    )
             yield Button(
-                "Use These Devices  →",
+                "Start ODIA  →",
                 id="finish-setup",
                 variant="success",
                 classes="primary-action",
