@@ -8,8 +8,11 @@ OpenCV 카메라 영상에서 YOLO-World로 객체를 탐지하는 실험용 Pyt
 `benchmarks/`에 분리되어 있습니다.
 프로젝트 문서는 [`docs/index.md`](docs/index.md)에서 찾을 수 있습니다.
 
-새 컴퓨터에서 환경을 준비하려면 [`bootstrap/README.md`](bootstrap/README.md)의
-uv 또는 Conda 절차를 따릅니다.
+새 컴퓨터에서는 운영체제에 맞는 `bootstrap/macos/setup.sh`,
+`bootstrap/linux/setup.sh`, 또는 `bootstrap/windows/setup.ps1`을 실행해 uv,
+Conda, Miniconda 중 하나를 선택할 수 있습니다. 설치가 끝나면 장치 및 AI 모델 선택
+TUI가 자동으로 시작됩니다. 자세한 내용은
+[`bootstrap/README.md`](bootstrap/README.md)를 참고하세요.
 
 ## uv 환경 설정
 

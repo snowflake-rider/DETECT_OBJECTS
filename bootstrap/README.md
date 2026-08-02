@@ -3,18 +3,71 @@
 This directory provides reproducible setup paths for new contributors. Run all
 commands from the repository root.
 
+## Guided setup
+
+Choose the entrypoint for the current operating system:
+
+```bash
+# macOS
+./bootstrap/macos/setup.sh
+
+# Linux
+./bootstrap/linux/setup.sh
+
+# Windows PowerShell
+powershell -ExecutionPolicy Bypass -File .\bootstrap\windows\setup.ps1
+```
+
+On macOS and Linux, `./bootstrap/setup.sh` remains a convenience entrypoint and
+detects the platform automatically. The Windows entrypoint is native PowerShell
+and does not require Git Bash or WSL.
+
+Use the arrow keys and Enter to choose **★ uv (recommended)**, an existing
+Conda installation, or a private project-local Miniconda installation. After
+installation and verification, the launcher starts ODIA's device and model
+selection wizard automatically.
+
+uv is the recommended default because it is usually the fastest and most
+reproducible option for this project. It is not accurate to call any virtual
+environment fully portable between machines. The existing-Conda option keeps
+the ODIA environment and caches local but reuses a Conda executable already on
+the machine; Miniconda is the fully project-local Conda distribution option.
+
+For automation, bypass the chooser or stop after installation:
+
+```bash
+./bootstrap/macos/setup.sh uv
+./bootstrap/linux/setup.sh conda --install-only
+powershell -ExecutionPolicy Bypass -File .\bootstrap\windows\setup.ps1 uv -InstallOnly
+```
+
+Each OS-specific entrypoint presents the same three choices and keeps the ODIA
+environment and caches below the repository. The Windows script uses
+Windows-native `uv.exe`, Conda executables, Miniconda installer, paths, and
+PowerShell commands. macOS and Linux share the Bash interaction code but reject
+being run on the wrong operating system.
+
+On Linux, `sounddevice` may also require the PortAudio runtime supplied by the
+distribution (for example, `libportaudio2` on Debian/Ubuntu). The script keeps
+Python packages local but does not use `sudo` or install operating-system
+packages automatically.
+
 ## Project-local layout
 
 Bootstrap state is contained in the repository and ignored by Git:
 
 ```text
 detect_objects/
+├── bootstrap/
+│   ├── macos/setup.sh         # guarded macOS entrypoint
+│   ├── linux/setup.sh         # guarded Linux entrypoint
+│   └── windows/setup.ps1      # native Windows entrypoint
 ├── odia-conda/                 # existing-Conda environment
 ├── odia-miniconda/             # managed-Miniconda environment
 ├── odia-uv/                    # uv environment
 └── .odia-tools/
     ├── miniconda3/             # managed Miniconda distribution
-    ├── bin/uv                  # project-local uv executable
+    ├── bin/uv[.exe]            # project-local uv executable
     ├── conda-pkgs/             # Conda package cache
     ├── pip-cache/              # pip download cache
     ├── uv-cache/               # uv package cache
