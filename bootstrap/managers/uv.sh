@@ -9,18 +9,9 @@ set -euo pipefail
 #   4. Download models, verify the environment, and start ODIA.
 
 # Find this file, bootstrap/, and then the project root.
-manager_dir="$(cd
-    "$(dirname "${BASH_SOURCE[0]}")"
-    && pwd
-)"
-bootstrap_dir="$(cd
-    "${manager_dir}/.."
-    && pwd
-)"
-project_root="$(cd
-    "${bootstrap_dir}/.."
-    && pwd
-)"
+manager_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+bootstrap_dir="$(cd "${manager_dir}/.." && pwd)"
+project_root="$(cd "${bootstrap_dir}/.." && pwd)"
 
 # source reads download.sh inside this current shell; it does not start a
 # separate shell program. download.sh defines download_file(), so nothing is
