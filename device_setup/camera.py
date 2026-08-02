@@ -53,11 +53,7 @@ class Camera:
     @classmethod
     def choose(cls) -> CameraInfo | None:
         """Display available cameras and let the user select one."""
-        backend = cls.get_backend()
-
-        # Passing a backend gives us normal camera indexes such as 0 and 1.
-        # Without it, some systems return indexes containing a backend offset.
-        cameras = list(enumerate_cameras(backend))
+        cameras = cls.list_devices()
 
         if not cameras:
             cls.console.print("[yellow]No available cameras were found.[/yellow]")
@@ -167,6 +163,14 @@ class Camera:
         cls.console.print("[green]Camera test completed.[/green]")
         return camera
 
+    @classmethod
+    def list_devices(cls) -> list[CameraInfo]:
+        """Return cameras available through the preferred OpenCV backend."""
+        backend = cls.get_backend()
+
+        # Passing a backend gives us normal camera indexes such as 0 and 1.
+        # Without it, some systems return indexes containing a backend offset.
+        return list(enumerate_cameras(backend))
 
 
 if __name__ == "__main__":
