@@ -13,13 +13,13 @@ htmlcov/
 venv/
 env/
 .conda/
+.odia/
+
+# Legacy bootstrap locations (before state was consolidated under .odia/)
 odia-conda/
 odia-miniconda/
 odia-uv/
 .odia-tools/
-bootstrap/test/.state/
-bootstrap/test/*.md
-!bootstrap/test/README.md
 
 # Packaging and build output
 build/

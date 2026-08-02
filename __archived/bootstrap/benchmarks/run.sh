@@ -135,7 +135,7 @@ find_conda_engine() {
         done
     fi
 
-    candidate="${project_root}/.odia-tools/miniconda3/bin/conda"
+    candidate="${project_root}/.odia/tools/miniconda3/bin/conda"
     if [[ -x "${candidate}" ]]; then
         printf '%s\n' "${candidate}"
         return
@@ -177,7 +177,7 @@ run_miniconda_test() {
         ODIA_CONDA_ENV_DIR="${test_miniconda_environment}" \
         ODIA_CONDA_PKGS_DIR="${test_conda_pkgs_dir}" \
         ODIA_PIP_CACHE_DIR="${test_pip_cache_dir}" \
-        ./bootstrap/miniconda/setup.sh
+        ./bootstrap/managers/miniconda.sh install
 }
 
 run_conda_test() {
@@ -191,7 +191,7 @@ run_conda_test() {
         ODIA_CONDA_ENV_DIR="${test_conda_environment}" \
         ODIA_CONDA_PKGS_DIR="${test_conda_pkgs_dir}" \
         ODIA_PIP_CACHE_DIR="${test_pip_cache_dir}" \
-        ./bootstrap/conda/setup.sh
+        ./bootstrap/managers/conda.sh install
 }
 
 run_uv_test() {
@@ -201,7 +201,7 @@ run_uv_test() {
         ODIA_UV_CACHE_DIR="${test_uv_cache_dir}" \
         ODIA_UV_PYTHON_INSTALL_DIR="${test_uv_python_dir}" \
         UV_PROJECT_ENVIRONMENT="${test_uv_environment}" \
-        ./bootstrap/uv/setup.sh
+        ./bootstrap/managers/uv.sh install
 }
 
 run_selected_test() {
@@ -238,7 +238,7 @@ prepare_test_state
 ensure_required_model
 
 # Exclude user-managed Conda and uv executables from discovery. All tools
-# installed during this test remain below bootstrap/test/.state.
+# installed during this benchmark remain below bootstrap/benchmarks/.state.
 test_path="${test_bin_dir}:/usr/bin:/bin:/usr/sbin:/sbin"
 test_environment=(
     "HOME=${test_home_dir}"

@@ -4,14 +4,10 @@
 - Dependency metadata: `pyproject.toml`
 - Locked versions: `uv.lock`
 
-## Easy Run
+## Run
 
 ```shell
-# Install dependencies and required model weights, then verify the environment.
-./bootstrap/uv/setup.sh
-
-# Run the complete application.
-UV_PROJECT_ENVIRONMENT=odia-uv uv run odia
+./bootstrap/setup.sh uv
 ```
 
 See [`bootstrap/README.md`](../../bootstrap/README.md) for the Conda path and

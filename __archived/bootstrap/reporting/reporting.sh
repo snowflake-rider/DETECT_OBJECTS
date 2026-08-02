@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Shared timing and Markdown reporting for bootstrap entry points.
+# Shared timing and Markdown reporting for bootstrap manager scripts.
 
 bootstrap_report_init() {
     bootstrap_report_name="$1"
@@ -17,7 +17,14 @@ bootstrap_report_init() {
         return
     fi
 
-    bootstrap_report_dir="${ODIA_BOOTSTRAP_REPORT_DIR:-${bootstrap_report_project_root}/bootstrap/test}"
+    bootstrap_report_state_dir="${ODIA_STATE_DIR:-.odia}"
+    case "${bootstrap_report_state_dir}" in
+        /*) ;;
+        *)
+            bootstrap_report_state_dir="${bootstrap_report_project_root}/${bootstrap_report_state_dir}"
+            ;;
+    esac
+    bootstrap_report_dir="${ODIA_BOOTSTRAP_REPORT_DIR:-${bootstrap_report_state_dir}/reports}"
     bootstrap_report_path="${bootstrap_report_dir}/${bootstrap_report_name}.md"
     bootstrap_report_started_epoch="$(date +%s)"
     bootstrap_report_started_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"

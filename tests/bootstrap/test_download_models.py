@@ -7,9 +7,8 @@ import tempfile
 import unittest
 from unittest.mock import Mock
 
-from bootstrap.download_models import download_required_models
+from bootstrap.tools.download_models import download_required_models
 from detect_objects.models.model_config import configured_yolo_world_weights_path
-
 
 VALID_YOLO_CONFIG = """
 [vision.yolo_world]

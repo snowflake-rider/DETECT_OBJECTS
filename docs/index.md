@@ -17,6 +17,10 @@ Project-wide documentation is grouped here by purpose.
 
 - [uv environment](setup/uv_environment.md)
 
+## Distributed nodes
+
+- [Running Python modules](distributed/python_module_commands.md)
+
 ## Platforms
 
 - [Legacy Raspberry Pi SSH access](platforms/raspberry-pi/legacy_ssh_access.md)

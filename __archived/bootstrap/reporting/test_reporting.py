@@ -8,9 +8,8 @@ import subprocess
 import tempfile
 import unittest
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-REPORTING_SCRIPT = PROJECT_ROOT / "bootstrap" / "reporting.sh"
+REPORTING_SCRIPT = PROJECT_ROOT / "bootstrap" / "lib" / "reporting.sh"
 
 
 class BootstrapReportingTests(unittest.TestCase):
@@ -23,7 +22,7 @@ class BootstrapReportingTests(unittest.TestCase):
             script = f"""
                 set -euo pipefail
                 source {REPORTING_SCRIPT!s}
-                bootstrap_report_init test test-env {PROJECT_ROOT!s} bootstrap/test.sh
+                bootstrap_report_init test test-env {PROJECT_ROOT!s} bootstrap/managers/test.sh
                 bootstrap_report_install_exit_trap
                 bootstrap_report_step_start "Example stage"
                 exit {exit_status}

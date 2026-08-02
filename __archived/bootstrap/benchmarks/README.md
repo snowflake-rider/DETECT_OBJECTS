@@ -1,6 +1,8 @@
-# Bootstrap from-scratch tests and timing reports
+# Archived bootstrap from-scratch benchmarks and timing reports
 
-Each top-level bootstrap script writes its latest timing report here:
+This harness is retained for reference and is no longer part of active setup.
+
+Each bootstrap manager writes its latest timing report here:
 
 - `conda.md`
 - `miniconda.md`
@@ -14,19 +16,19 @@ Generated reports are machine-specific and ignored by Git. Set
 Run all three setup paths from clean, isolated installations with:
 
 ```bash
-./bootstrap/test/test.sh
-./bootstrap/test/test.sh all
+./bootstrap/benchmarks/run.sh
+./bootstrap/benchmarks/run.sh all
 ```
 
 Run one setup path from a clean, isolated installation with:
 
 ```bash
-./bootstrap/test/test.sh miniconda
-./bootstrap/test/test.sh conda
-./bootstrap/test/test.sh uv
+./bootstrap/benchmarks/run.sh miniconda
+./bootstrap/benchmarks/run.sh conda
+./bootstrap/benchmarks/run.sh uv
 ```
 
-The harness removes only `bootstrap/test/.state`, never system or personal
+The harness removes only `bootstrap/benchmarks/.state`, never system or personal
 Conda, Miniconda, or uv installations. It cleans test-owned installations both
 before the run, between every package-manager setup, and after the run.
 Environments, package-manager binaries, caches, and managed Python
@@ -34,12 +36,12 @@ installations are all isolated below that directory. Set
 `ODIA_BOOTSTRAP_TEST_KEEP_STATE=1` to preserve the final uv test state for
 debugging after a run.
 
-The Conda setup requires an existing Conda executable as its engine, but starts
+The Conda benchmark requires an existing Conda executable as its engine, but starts
 with an empty project environment and package caches. The harness discovers
 common Conda locations automatically. Override it when needed:
 
 ```bash
-ODIA_BOOTSTRAP_TEST_CONDA_COMMAND=/path/to/conda ./bootstrap/test/test.sh
+ODIA_BOOTSTRAP_TEST_CONDA_COMMAND=/path/to/conda ./bootstrap/benchmarks/run.sh
 ```
 
 After an `all` run, `comparison.md` summarizes total times. An individual run
@@ -51,5 +53,5 @@ one-time download penalty.
 Remove leftover test-owned installations without running setup again:
 
 ```bash
-./bootstrap/test/test.sh --clean-only
+./bootstrap/benchmarks/run.sh --clean-only
 ```
