@@ -90,9 +90,12 @@ failed runs are recorded too.
 Set `ODIA_BOOTSTRAP_REPORT_DIR` to use another report directory, or disable
 reporting with `ODIA_BOOTSTRAP_REPORT=0`.
 
-Run `./bootstrap/test/test.sh` to remove prior test-owned installations and run
-all three setup paths from scratch. The harness isolates everything under
-`bootstrap/test/.state` and never removes system or personal installations.
+Run `./bootstrap/test/test.sh` (or `./bootstrap/test/test.sh all`) to remove
+prior test-owned installations and run all three setup paths from scratch. Pass
+`miniconda`, `conda`, or `uv` instead to benchmark one setup independently. The
+harness clears environments and caches between each selected setup, writes
+`bootstrap/test/comparison.md` after an `all` run, isolates everything under
+`bootstrap/test/.state`, and never removes system or personal installations.
 
 ## Verify an existing environment
 

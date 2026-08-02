@@ -7,6 +7,7 @@ project_root="$(cd "${bootstrap_dir}/../.." && pwd)"
 conda_env_dir="${ODIA_CONDA_ENV_DIR:-${project_root}/${ODIA_CONDA_ENV:-odia-conda}}"
 conda_pkgs_dir="${ODIA_CONDA_PKGS_DIR:-${project_root}/.odia-tools/conda-pkgs}"
 pip_cache_dir="${ODIA_PIP_CACHE_DIR:-${project_root}/.odia-tools/pip-cache}"
+conda_channel="${ODIA_CONDA_CHANNEL:-conda-forge}"
 
 if [[ "${conda_env_dir}" != /* ]]; then
     conda_env_dir="${project_root}/${conda_env_dir}"
@@ -40,6 +41,14 @@ mkdir -p "${conda_pkgs_dir}" "${pip_cache_dir}"
 
 conda_project_command() {
     env \
+        -u CONDA_DEFAULT_ENV \
+        -u CONDA_EXE \
+        -u CONDA_PREFIX \
+        -u CONDA_PROMPT_MODIFIER \
+        -u CONDA_PYTHON_EXE \
+        -u CONDA_SHLVL \
+        -u _CE_CONDA \
+        -u _CE_M \
         CONDA_PKGS_DIRS="${conda_pkgs_dir}" \
         PIP_CACHE_DIR="${pip_cache_dir}" \
         "${conda_command}" "$@"
@@ -47,7 +56,11 @@ conda_project_command() {
 
 bootstrap_report_step_start "Prepare Python 3.11 environment"
 if ! conda_project_command run --prefix "${conda_env_dir}" python -c "import sys; raise SystemExit(sys.version_info[:2] != (3, 11))" >/dev/null 2>&1; then
-    conda_project_command create --prefix "${conda_env_dir}" python=3.11 pip --yes
+    conda_project_command create \
+        --prefix "${conda_env_dir}" \
+        --override-channels \
+        --channel "${conda_channel}" \
+        python=3.11 pip --yes
 fi
 bootstrap_report_step_end
 

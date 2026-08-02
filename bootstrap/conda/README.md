@@ -20,6 +20,13 @@ Conda and pip package caches default to `.odia-tools/conda-pkgs` and
 `.odia-tools/pip-cache`. Override them with `ODIA_CONDA_PKGS_DIR` and
 `ODIA_PIP_CACHE_DIR`.
 
+Environment creation uses `conda-forge` explicitly so it also works with an
+empty or missing `.condarc`. Set `ODIA_CONDA_CHANNEL` to use another channel:
+
+```bash
+ODIA_CONDA_CHANNEL=my-channel ./bootstrap/conda/setup.sh
+```
+
 If `conda` is not on `PATH`, provide its executable explicitly:
 
 ```bash
@@ -27,7 +34,9 @@ ODIA_CONDA_COMMAND=/path/to/conda ./bootstrap/conda/setup.sh
 ```
 
 The executable is used only to create and operate the project-local prefix; no
-packages are installed into its base or named environments.
+packages are installed into its base or named environments. Conda activation
+variables inherited from the current shell are ignored, so the selected
+executable remains authoritative even when another Conda base is active.
 
 To install a private Miniconda distribution for ODIA instead, run:
 

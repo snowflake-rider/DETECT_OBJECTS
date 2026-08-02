@@ -28,3 +28,6 @@ ODIA_MINICONDA_INSTALL_DIR=/path/to/miniconda3 ./bootstrap/miniconda/setup.sh
 
 `ODIA_CONDA_INSTALL_DIR` remains supported as a legacy alias for the install
 location.
+
+Environment creation uses `conda-forge` explicitly so it works without a user
+`.condarc`. Set `ODIA_CONDA_CHANNEL` to select another Conda channel.

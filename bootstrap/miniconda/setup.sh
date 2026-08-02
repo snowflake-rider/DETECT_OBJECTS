@@ -94,5 +94,6 @@ bootstrap_report_step_start "Configure ODIA environment"
 ODIA_BOOTSTRAP_REPORT=0 \
     ODIA_CONDA_ENV_DIR="${conda_env_dir}" \
     ODIA_CONDA_COMMAND="${conda_command}" \
+    ODIA_CONDA_CHANNEL="${ODIA_CONDA_CHANNEL:-conda-forge}" \
     "${project_root}/bootstrap/conda/setup.sh"
 bootstrap_report_step_end
