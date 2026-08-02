@@ -6,12 +6,12 @@ From the repository root, run:
 ./bootstrap/uv/setup.sh
 ```
 
-If necessary, the script first installs `uv` into the standard user executable
-directory without modifying shell profiles. It then creates or updates the
-`odia-uv` environment directory from `uv.lock`, downloads the configured
-YOLO-World weights when they are missing, verifies the installation, and prints
-exact launch and activation commands.
-The latest timing report is written to `bootstrap/reports/uv.md`.
+The script installs its own uv executable under `.odia-tools/bin` without
+modifying shell profiles. It creates or updates the `odia-uv` environment from
+`uv.lock`, keeps the uv cache and managed Python installations under
+`.odia-tools`, downloads the configured YOLO-World weights when missing,
+verifies the installation, and prints exact launch and activation commands.
+The latest timing report is written to `bootstrap/test/uv.md`.
 
 Set `UV_PROJECT_ENVIRONMENT` to choose a different environment directory:
 
@@ -24,3 +24,6 @@ To choose where the `uv` executable is installed:
 ```bash
 ODIA_UV_INSTALL_DIR=/path/to/bin ./bootstrap/uv/setup.sh
 ```
+
+Override the project-local cache and managed-Python directories with
+`ODIA_UV_CACHE_DIR` and `ODIA_UV_PYTHON_INSTALL_DIR`.

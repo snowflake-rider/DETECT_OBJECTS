@@ -6,18 +6,18 @@ From the repository root, run:
 ./bootstrap/miniconda/setup.sh
 ```
 
-The script installs a private Miniconda distribution under the standard user
-data directory without modifying shell profiles. It then delegates environment
-creation to `bootstrap/conda/setup.sh`. Automatic installation supports macOS
-and Linux on Apple Silicon/ARM64 and x86-64. The delegated setup also downloads
-the configured YOLO-World weights when they are missing.
-The latest timing report is written to `bootstrap/reports/miniconda.md`.
+The script installs a private Miniconda distribution under the project-local
+`.odia-tools/miniconda3` directory without modifying shell profiles. It then
+delegates creation of the `odia-miniconda` environment directory to
+`bootstrap/conda/setup.sh`. Automatic installation supports macOS and Linux on
+Apple Silicon/ARM64 and x86-64. The delegated setup also downloads the
+configured YOLO-World weights when they are missing.
+The latest timing report is written to `bootstrap/test/miniconda.md`.
 
-The default environment name is `odia-miniconda`. Set `ODIA_CONDA_ENV` to
-choose a different name:
+Set `ODIA_CONDA_ENV_DIR` to choose a different environment path:
 
 ```bash
-ODIA_CONDA_ENV=my-environment ./bootstrap/miniconda/setup.sh
+ODIA_CONDA_ENV_DIR=/path/to/environment ./bootstrap/miniconda/setup.sh
 ```
 
 Set `ODIA_MINICONDA_INSTALL_DIR` to choose the Miniconda installation location:

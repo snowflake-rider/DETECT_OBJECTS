@@ -4,7 +4,14 @@ set -euo pipefail
 
 bootstrap_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_root="$(cd "${bootstrap_dir}/../.." && pwd)"
-uv_environment="${UV_PROJECT_ENVIRONMENT:-odia-uv}"
+uv_environment="${UV_PROJECT_ENVIRONMENT:-${project_root}/odia-uv}"
+uv_install_dir="${ODIA_UV_INSTALL_DIR:-${project_root}/.odia-tools/bin}"
+uv_cache_dir="${ODIA_UV_CACHE_DIR:-${project_root}/.odia-tools/uv-cache}"
+uv_python_install_dir="${ODIA_UV_PYTHON_INSTALL_DIR:-${project_root}/.odia-tools/uv-python}"
+
+if [[ "${uv_environment}" != /* ]]; then
+    uv_environment="${project_root}/${uv_environment}"
+fi
 
 source "${bootstrap_dir}/../reporting.sh"
 bootstrap_report_init \
@@ -29,16 +36,10 @@ download_file() {
     fi
 }
 
-uv_command="$(command -v uv || true)"
+uv_command="${uv_install_dir}/uv"
 
 bootstrap_report_step_start "Locate or install uv"
-if [[ -z "${uv_command}" ]]; then
-    if [[ -z "${HOME:-}" && -z "${XDG_BIN_HOME:-}" ]]; then
-        echo "Installing uv requires HOME or XDG_BIN_HOME to be set." >&2
-        exit 1
-    fi
-
-    uv_install_dir="${ODIA_UV_INSTALL_DIR:-${XDG_BIN_HOME:-${HOME}/.local/bin}}"
+if [[ ! -x "${uv_command}" ]]; then
     uv_installer="$(mktemp "${TMPDIR:-/tmp}/odia-uv-install.XXXXXX")"
     bootstrap_report_register_cleanup_file "${uv_installer}"
 
@@ -56,21 +57,27 @@ fi
 bootstrap_report_step_end
 
 cd "${project_root}"
+uv_project_command() {
+    env \
+        UV_CACHE_DIR="${uv_cache_dir}" \
+        UV_PROJECT_ENVIRONMENT="${uv_environment}" \
+        UV_PYTHON_INSTALL_DIR="${uv_python_install_dir}" \
+        "${uv_command}" "$@"
+}
+
 bootstrap_report_step_start "Sync Python environment"
-UV_PROJECT_ENVIRONMENT="${uv_environment}" "${uv_command}" sync --locked
+uv_project_command sync --locked
 bootstrap_report_step_end
 bootstrap_report_step_start "Download required models"
-UV_PROJECT_ENVIRONMENT="${uv_environment}" \
-    "${uv_command}" run python bootstrap/download_models.py
+uv_project_command run python bootstrap/download_models.py
 bootstrap_report_step_end
 bootstrap_report_step_start "Verify environment"
-UV_PROJECT_ENVIRONMENT="${uv_environment}" \
-    "${uv_command}" run python bootstrap/verify_environment.py
+uv_project_command run python bootstrap/verify_environment.py
 bootstrap_report_step_end
 
 echo
 echo "Environment ready. Run ODIA with:"
-echo "  UV_PROJECT_ENVIRONMENT=\"${uv_environment}\" \"${uv_command}\" run odia"
+echo "  UV_CACHE_DIR=\"${uv_cache_dir}\" UV_PROJECT_ENVIRONMENT=\"${uv_environment}\" UV_PYTHON_INSTALL_DIR=\"${uv_python_install_dir}\" \"${uv_command}\" run odia"
 echo
 echo "Or activate the environment:"
 echo "  source \"${uv_environment}/bin/activate\""

@@ -17,7 +17,7 @@ bootstrap_report_init() {
         return
     fi
 
-    bootstrap_report_dir="${ODIA_BOOTSTRAP_REPORT_DIR:-${bootstrap_report_project_root}/bootstrap/reports}"
+    bootstrap_report_dir="${ODIA_BOOTSTRAP_REPORT_DIR:-${bootstrap_report_project_root}/bootstrap/test}"
     bootstrap_report_path="${bootstrap_report_dir}/${bootstrap_report_name}.md"
     bootstrap_report_started_epoch="$(date +%s)"
     bootstrap_report_started_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"

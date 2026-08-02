@@ -13,9 +13,13 @@ htmlcov/
 venv/
 env/
 .conda/
+odia-conda/
+odia-miniconda/
 odia-uv/
-bootstrap/reports/*.md
-!bootstrap/reports/README.md
+.odia-tools/
+bootstrap/test/.state/
+bootstrap/test/*.md
+!bootstrap/test/README.md
 
 # Packaging and build output
 build/
