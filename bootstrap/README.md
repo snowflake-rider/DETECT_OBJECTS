@@ -17,30 +17,40 @@ directory without editing shell profiles. It then installs the locked Python
 and verifies required imports and runtime resources. The script prints the
 exact command to launch ODIA.
 
-## Conda
+## Existing Conda
 
-Run:
+If Conda is already installed, run:
 
 ```bash
 ./bootstrap/conda/setup.sh
 ```
 
+This path works with an existing Miniconda, Miniforge, or Anaconda Distribution
+installation. It does not install Conda automatically.
+
+## Managed Miniconda
+
+To install a private Miniconda distribution for ODIA, run:
+
+```bash
+./bootstrap/miniconda/setup.sh
+```
+
 The default environment name is `odia`. To choose another name:
 
 ```bash
-ODIA_CONDA_ENV=my-environment ./bootstrap/conda/setup.sh
+ODIA_CONDA_ENV=my-environment ./bootstrap/miniconda/setup.sh
 ```
 
-If `conda` is missing, the script installs Miniconda under the standard user
-data directory without editing shell profiles. The Conda path then creates a
-Python 3.11 environment and installs `requirements.txt` followed by the local
-src-layout package. Automatic Miniconda installation supports macOS and Linux
-on Apple Silicon/ARM64 and x86-64.
-The script prints both a direct launch command and the appropriate activation
-command.
+The managed path installs Miniconda under the standard user data directory
+without editing shell profiles. It supports macOS and Linux on Apple
+Silicon/ARM64 and x86-64. Both Conda paths create a Python 3.11 environment,
+install `requirements.txt` and the local src-layout package, verify the result,
+and print direct launch and activation commands.
 
-Both installers require either `curl` or `wget`. Custom install locations are
-available through `ODIA_UV_INSTALL_DIR` and `ODIA_CONDA_INSTALL_DIR`.
+The uv and managed Miniconda installers require either `curl` or `wget`. Custom
+install locations are available through `ODIA_UV_INSTALL_DIR` and
+`ODIA_MINICONDA_INSTALL_DIR`.
 
 ## Verify an existing environment
 
