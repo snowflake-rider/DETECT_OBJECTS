@@ -18,6 +18,7 @@ uv sync --locked
 uv run python camera_cv/list_cameras.py
 uv run python camera_cv/camera_test.py
 uv run python camera_cv/camera.py --camera-index 0
+uv run python -m tui.app
 ```
 
 셸에서 환경을 활성화하려면 다음 명령을 사용합니다.
@@ -32,8 +33,10 @@ source .venv/bin/activate
 - `camera_cv/list_cameras.py`: 운영체제에 맞는 OpenCV 백엔드로 사용 가능한
   카메라 인덱스를 찾습니다.
 - `camera_cv/camera_test.py`: 모델 없이 카메라 프리뷰만 확인합니다.
-- `camera_tools/find_cameras.py`: 여러 운영체제에서 사용할 수 있는 카메라
-  인덱스와 실행 환경을 JSON으로 확인합니다.
+- `device_setup/`: UI와 독립적으로 카메라와 마이크를 검색하고 선택 정보를
+  저장합니다.
+- `tui/`: Textual 장치 선택 화면과 애플리케이션 셸을 제공합니다.
+- `cli/`: 선택적으로 사용할 수 있는 Rich 기반 장치 설정 인터페이스입니다.
 - `models/device_selector.py`: MPS, CUDA, CPU 순으로 추론 장치를 선택합니다.
 - `models/yolo_world_module.py`: YOLO-World 모델의 로딩, 추론, 해제를 관리합니다.
 
@@ -43,7 +46,8 @@ source .venv/bin/activate
 python camera_cv/list_cameras.py
 python camera_cv/camera_test.py
 python camera_cv/camera.py --camera-index 0
-python camera_tools/find_cameras.py
+python -m tui.app
+python -m cli.device_setup
 ```
 
 카메라 프리뷰에서는 `q`를 눌러 종료합니다.
@@ -74,11 +78,10 @@ python camera_cv/list_cameras.py --max-index 15 --attempts 20
 python camera_cv/camera.py --camera-index 1
 ```
 
-여러 운영체제에서 카메라와 실행 환경 정보를 JSON으로 확인하려면 다음 명령을
-사용할 수도 있습니다.
+Textual 화면에서 카메라와 마이크를 함께 선택하려면 다음 명령을 사용합니다.
 
 ```bash
-python camera_tools/find_cameras.py --start-index 0 --max-index 9
+python -m tui.app
 ```
 
 카메라가 검색되지 않으면 다른 애플리케이션이 카메라를 사용 중인지 확인하고,

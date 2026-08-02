@@ -1,60 +1,18 @@
-"""Select the camera and microphone for one run in a Textual interface."""
+"""Textual screen for selecting camera and microphone input devices."""
 
 from __future__ import annotations
 
-from cv2_enumerate_cameras.camera_info import CameraInfo
 from textual import on
-from textual.app import App, ComposeResult
+from textual.app import ComposeResult
 from textual.containers import Container
+from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Label, Select, Static
 
-from .audio import Audio, AudioInfo
-from .camera import Camera
-from .context import Context
-from .environment import Environment
+from device_setup import Audio, AudioInfo, Camera, CameraInfo, Context, Environment
 
 
-class DeviceSetupApp(App[Context | None]):
+class DeviceSetupScreen(Screen[Context]):
     """Collect a camera and microphone without blocking terminal prompts."""
-
-    TITLE = "ODIA Device Setup"
-    SUB_TITLE = "Choose the devices to use for this run"
-
-    CSS = """
-    Screen {
-        align: center middle;
-    }
-
-    #setup-panel {
-        width: 64;
-        height: auto;
-        padding: 1 2;
-        border: round $accent;
-        background: $panel;
-    }
-
-    .field-label {
-        margin-top: 1;
-    }
-
-    Select {
-        width: 100%;
-        margin-bottom: 1;
-    }
-
-    #continue {
-        width: 100%;
-        margin-top: 1;
-    }
-
-    #status {
-        height: auto;
-        margin-top: 1;
-        text-align: center;
-    }
-    """
-
-    BINDINGS = [("q", "quit", "Quit")]
 
     def __init__(self) -> None:
         super().__init__()
@@ -64,7 +22,6 @@ class DeviceSetupApp(App[Context | None]):
     def compose(self) -> ComposeResult:
         """Create the device selectors and confirmation control."""
         yield Header()
-
         with Container(id="setup-panel"):
             yield Label("Camera", classes="field-label")
             yield Select[int](
@@ -89,13 +46,11 @@ class DeviceSetupApp(App[Context | None]):
                 disabled=True,
             )
             yield Static("Finding devices...", id="status")
-
         yield Footer()
 
     def on_mount(self) -> None:
         """Discover devices and populate both selectors."""
         errors: list[str] = []
-
         try:
             cameras = Camera.list_devices()
         except Exception as error:
@@ -110,7 +65,6 @@ class DeviceSetupApp(App[Context | None]):
 
         self.cameras = {camera.index: camera for camera in cameras}
         self.microphones = {microphone.index: microphone for microphone in microphones}
-
         self.query_one("#camera", Select).set_options(
             (camera.name, camera.index) for camera in cameras
         )
@@ -142,39 +96,19 @@ class DeviceSetupApp(App[Context | None]):
 
     @on(Button.Pressed, "#continue")
     def create_context(self) -> None:
-        """Create and return the context selected by the user."""
+        """Create the selected context and dismiss this screen."""
         camera_index = self.query_one("#camera", Select).selection
         microphone_index = self.query_one("#microphone", Select).selection
-
         if camera_index is None or microphone_index is None:
             self.query_one("#status", Static).update(
                 "Select both devices before continuing."
             )
             return
 
-        context = Context(
-            environment=Environment.detect(),
-            camera=Camera(self.cameras[camera_index]),
-            audio=Audio(self.microphones[microphone_index]),
+        self.dismiss(
+            Context(
+                environment=Environment.detect(),
+                camera=Camera(self.cameras[camera_index]),
+                audio=Audio(self.microphones[microphone_index]),
+            )
         )
-        self.exit(context)
-
-
-def run_setup() -> Context | None:
-    """Run the Textual device setup and return the completed context."""
-    return DeviceSetupApp().run()
-
-
-def main() -> int:
-    """Run device setup as a standalone application."""
-    context = run_setup()
-    if context is None:
-        return 1
-
-    print(f"Camera: {context.camera.info.name}")
-    print(f"Microphone: {context.audio.info.name}")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
