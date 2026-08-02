@@ -78,6 +78,13 @@ class Camera_Manager:
             self._gc_resource()
             raise RuntimeError("error occured while loading YOLO World Module\n")
 
+    @property
+    def inference_device_name(self) -> str:
+        """Return the device name selected by the loaded vision model."""
+        if self.__yolo_world_manager is None:
+            raise RuntimeError("The vision model has not been loaded.")
+        return self.__yolo_world_manager.device_name
+
     def _apply_latest_classes(self) -> None:
         """Apply the newest class request by swapping cached embeddings."""
         if self.__class_names_queue is None:

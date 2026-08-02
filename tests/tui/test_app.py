@@ -30,7 +30,8 @@ from detect_objects.models import (
     DEFAULT_VISION_MODEL_ID,
     ModelSelection,
 )
-from detect_objects.tui.app import OdiaApp
+from detect_objects.runtime import STARTUP_STEPS, StartupUpdate
+from detect_objects.tui.app import ODIA_THEME, OdiaApp, StartupApp
 from detect_objects.tui.device_setup_screen import (
     AudioInputScreen,
     AudioOutputScreen,
@@ -39,6 +40,7 @@ from detect_objects.tui.device_setup_screen import (
     SummaryScreen,
     WelcomeScreen,
 )
+from detect_objects.tui.startup_screen import StartupScreen
 
 
 class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
@@ -71,6 +73,9 @@ class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
 
+            self.assertEqual(app.theme, ODIA_THEME.name)
+            self.assertFalse(app.current_theme.ansi)
+            self.assertEqual(app.current_theme.background, "#07111f")
             self.assertIsInstance(app.screen, WelcomeScreen)
             content = " ".join(
                 str(widget.content) for widget in app.screen.query(Static)
@@ -295,6 +300,52 @@ class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
         output_probe.assert_not_called()
         input_monitor.assert_not_called()
         camera_test.assert_not_called()
+
+
+class StartupAppTests(unittest.IsolatedAsyncioTestCase):
+    async def test_shows_runtime_updates_before_opening_camera(self) -> None:
+        def prepare(report) -> None:
+            for step in STARTUP_STEPS:
+                report(StartupUpdate(step, f"{step} ready", finished=True))
+
+        app = StartupApp(prepare)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+
+            self.assertIsInstance(app.screen, StartupScreen)
+            content = " ".join(
+                str(widget.content) for widget in app.screen.query(Static)
+            )
+            for step in STARTUP_STEPS:
+                self.assertIn(f"{step} ready", content)
+
+            finish_button = app.screen.query_one("#finish-startup", Button)
+            self.assertFalse(finish_button.disabled)
+            self.assertEqual(str(finish_button.label), "Open Camera  →")
+            await pilot.click("#finish-startup")
+            await pilot.pause()
+
+        self.assertTrue(app.return_value)
+
+    async def test_shows_startup_error_and_does_not_continue(self) -> None:
+        def fail(report) -> None:
+            raise RuntimeError("model missing")
+
+        app = StartupApp(fail)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+
+            status = app.screen.query_one("#startup-status", Static)
+            self.assertIn("model missing", str(status.content))
+            close_button = app.screen.query_one("#finish-startup", Button)
+            self.assertFalse(close_button.disabled)
+            self.assertEqual(str(close_button.label), "Close")
+            await pilot.click("#finish-startup")
+            await pilot.pause()
+
+        self.assertFalse(app.return_value)
 
 
 if __name__ == "__main__":

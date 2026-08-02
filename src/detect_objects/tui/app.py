@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from textual.app import App
+from textual.theme import Theme
 
 from ..device_setup import AudioInput, AudioOutput, Camera, Context
 from ..models import ModelSelection
@@ -15,6 +16,31 @@ from .device_setup_screen import (
     SummaryScreen,
     WelcomeScreen,
 )
+from .startup_screen import StartupScreen, StartupTask
+
+# Use the same RGB colors in every terminal instead of its 16-color palette.
+ODIA_THEME = Theme(
+    name="odia",
+    primary="#2563eb",
+    secondary="#0ea5e9",
+    accent="#7dd3fc",
+    foreground="#e5eef8",
+    background="#07111f",
+    surface="#0d1b2a",
+    panel="#132238",
+    boost="#1b3150",
+    success="#22c55e",
+    warning="#f59e0b",
+    error="#ef4444",
+    dark=True,
+    ansi=False,
+)
+
+
+def _apply_odia_theme(app: App) -> None:
+    """Register and select ODIA's fixed color palette."""
+    app.register_theme(ODIA_THEME)
+    app.theme = ODIA_THEME.name
 
 
 class OdiaApp(App[Context | None]):
@@ -265,6 +291,7 @@ class OdiaApp(App[Context | None]):
 
     def on_mount(self) -> None:
         """Open the welcome page as the first wizard screen."""
+        _apply_odia_theme(self)
         self.push_screen(WelcomeScreen(), self._welcome_finished)
 
     def _welcome_finished(self, started: bool) -> None:
@@ -295,9 +322,39 @@ class OdiaApp(App[Context | None]):
         self.exit(context)
 
 
+class StartupApp(App[bool | None]):
+    """Keep the TUI open while the selected models are prepared."""
+
+    CSS = OdiaApp.CSS + """
+    .startup-card {
+        width: 76;
+    }
+
+    .startup-step {
+        height: 2;
+        padding: 0 2;
+    }
+    """
+
+    BINDINGS = [("q", "quit", "Quit")]
+
+    def __init__(self, startup_task: StartupTask) -> None:
+        super().__init__()
+        self.startup_task = startup_task
+
+    def on_mount(self) -> None:
+        _apply_odia_theme(self)
+        self.push_screen(StartupScreen(self.startup_task), self.exit)
+
+
 def run_app() -> Context | None:
     """Run the Textual shell and return its selected runtime context."""
     return OdiaApp().run()
+
+
+def run_startup_app(startup_task: StartupTask) -> bool:
+    """Show runtime preparation and return whether startup succeeded."""
+    return StartupApp(startup_task).run() is True
 
 
 def main() -> int:
