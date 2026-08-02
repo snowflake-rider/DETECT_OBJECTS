@@ -19,7 +19,7 @@ class LaunchRoutingTests(unittest.TestCase):
             result = main()
 
         self.assertEqual(result, 0)
-        launch.assert_called_once_with()
+        launch.assert_called_once_with(context)
 
     def test_classic_mode_keeps_the_existing_runtime_path(self) -> None:
         context = SimpleNamespace(

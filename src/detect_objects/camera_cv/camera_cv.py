@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING
 from ..models import DEFAULT_VISION_MODEL_ID
 from ..models.factory import create_vision_manager
 
+CLASSIC_WINDOW_NAME = "ODIA Classic — press Q or Esc to quit"
+
 if TYPE_CHECKING:
     from ..models.yolo_world_module import YOLO_World_Manager
 
@@ -87,20 +89,30 @@ class Camera_Manager:
 
     def _apply_latest_classes(self) -> None:
         """Apply the newest class request by swapping cached embeddings."""
+        # Some camera uses may not have a voice-request mailbox.
         if self.__class_names_queue is None:
             return
 
+        # Start with no request received for this camera frame.
         latest_request = None
+
+        # Remove available requests without waiting.
+        # If several exist, the last one removed is the newest one.
         while True:
             try:
                 latest_request = self.__class_names_queue.get_nowait()
             except queue.Empty:
+                # Empty is normal: there are no more requests to read now.
                 break
 
+        # Keep using the current YOLO classes if Whisper sent nothing new.
         if latest_request is None:
             return
 
+        # Separate the queue item into its class list and creation time.
         new_classes, requested_at = latest_request
+
+        # Tell YOLO to detect the newly requested classes.
         self.__yolo_world_manager.activate_cached_classes(new_classes)
         self.__classes = new_classes
         print(
@@ -121,11 +133,14 @@ class Camera_Manager:
             raise RuntimeError(f"camera index {self.__camera_index} is unavailable!")
 
         while not self.__thread_event.is_set():
+            # Read one image frame from the camera.
             is_success, frame = self.__manager_obj.read()
             if not is_success:
                 print("cannot read frame")
                 break
-            # Apply embeddings between frames, never during predict().
+
+            # Check the voice mailbox before running YOLO on this frame.
+            # Apply changes between frames, never during predict().
             self._apply_latest_classes()
             frame_height, frame_width = frame.shape[:2]
             boxes, names = self.__yolo_world_manager.predict(frame=frame)
@@ -159,8 +174,21 @@ class Camera_Manager:
                     2,
                 )
 
-            cv2.imshow("Camera", frame)
-            if cv2.waitKey(1) & 0xFF == ord("q"):
+            cv2.imshow(CLASSIC_WINDOW_NAME, frame)
+            key = cv2.waitKey(1) & 0xFF
+            if key in (ord("q"), ord("Q"), 27):
+                break
+
+            try:
+                if (
+                    cv2.getWindowProperty(
+                        CLASSIC_WINDOW_NAME,
+                        cv2.WND_PROP_VISIBLE,
+                    )
+                    < 1
+                ):
+                    break
+            except cv2.error:
                 break
 
         self._gc_resource()
