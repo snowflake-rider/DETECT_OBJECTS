@@ -10,7 +10,7 @@ import re
 from time import perf_counter
 from typing import Any, Protocol, Self
 
-from ..model_config import SamAudioMlxConfig
+from detect_objects.models.model_config import SamAudioMlxConfig
 
 
 class SamAudioUnavailableError(RuntimeError):

@@ -8,6 +8,9 @@ OpenCV 카메라 영상에서 YOLO-World로 객체를 탐지하는 실험용 Pyt
 `benchmarks/`에 분리되어 있습니다.
 프로젝트 문서는 [`docs/index.md`](docs/index.md)에서 찾을 수 있습니다.
 
+새 컴퓨터에서 환경을 준비하려면 [`bootstrap/README.md`](bootstrap/README.md)의
+uv 또는 Conda 절차를 따릅니다.
+
 ## uv 환경 설정
 
 이 프로젝트는 Python 3.11을 사용합니다. `uv`가 설치되어 있다면 다음 명령으로
@@ -46,7 +49,7 @@ source .venv/bin/activate
 - `src/detect_objects/models/model_config.py`: `config/models.toml`을 읽고 모델 설정과 가중치
   경로를 검증합니다.
 - `src/detect_objects/models/yolo_world_module.py`: YOLO-World 모델의 로딩, 추론, 해제를 관리합니다.
-- `src/detect_objects/models/sound/`: Apple SoundAnalysis를 사용하는 macOS 사운드 분류 백엔드와
+- `prototypes/audio/`: Apple SoundAnalysis를 사용하는 macOS 사운드 분류 프로토타입과
   공통 결과 타입, MLX 기반 SAM-Audio 음원 분리 백엔드를 제공합니다.
 - `config/models.toml`: 모델 가중치 경로와 추론 기본값을 저장합니다. 가중치
   경로는 이 TOML 파일을 기준으로 해석됩니다. Apple 내장 사운드 분류기는
@@ -61,8 +64,8 @@ odia
 python -m detect_objects
 python -m detect_objects.camera_cv.camera_cv --camera-index 0
 python -m detect_objects.tui.app
-python -m detect_objects.models.sound /path/to/audio.wav
-python -m detect_objects.models.sound.separate /path/to/mixed.wav \
+python -m prototypes.audio /path/to/audio.wav
+python -m prototypes.audio.separate /path/to/mixed.wav \
   --prompt "dog barking" \
   --output-dir outputs/sam_audio
 ```

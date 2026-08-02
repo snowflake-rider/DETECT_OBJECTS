@@ -4,14 +4,10 @@ Project-wide documentation is grouped here by purpose.
 
 ## Roadmap
 
-- [Improving sound detection](roadmap/improving_sound_detection.md)
 
 ## Audio research
 
-- [Apple Silicon audio separation](research/audio/apple_silicon_audio_separation.md)
-- [Apple Silicon audio tagging](research/audio/apple_silicon_audio_tagging.md)
-- [Sample audio sources](research/audio/sample_audio_sources.md)
-- [Sound-model research](research/audio/sound_model_research.md)
+- [Audio detection and separation](research/audio.md)
 
 ## Reviews
 
@@ -29,9 +25,10 @@ Project-wide documentation is grouped here by purpose.
 ## Executable research
 
 - The multimodal pipeline prototype is under `prototypes/`.
+- Audio-classification and source-separation prototypes are under
+  `prototypes/audio/`.
 - Sound-model notebooks are under `notebooks/sound_models/`.
 
 Context-specific documentation remains beside the files it explains, including
 sample-audio attribution, archived refactor notes, model-artifact documentation,
 and the Python learning lab.
-

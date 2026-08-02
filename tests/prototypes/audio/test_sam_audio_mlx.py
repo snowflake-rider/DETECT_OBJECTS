@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from detect_objects.models.model_config import SamAudioMlxConfig
-from detect_objects.models.sound.sam_audio_mlx import (
+from prototypes.audio.sam_audio_mlx import (
     SamAudioMlxSeparator,
     SamAudioUnavailableError,
 )
@@ -139,11 +139,11 @@ class SamAudioMlxSeparatorTests(unittest.TestCase):
     def test_rejects_non_apple_silicon_platform(self) -> None:
         with (
             patch(
-                "detect_objects.models.sound.sam_audio_mlx.platform.system",
+                "prototypes.audio.sam_audio_mlx.platform.system",
                 return_value="Linux",
             ),
             patch(
-                "detect_objects.models.sound.sam_audio_mlx.platform.machine",
+                "prototypes.audio.sam_audio_mlx.platform.machine",
                 return_value="x86_64",
             ),
         ):

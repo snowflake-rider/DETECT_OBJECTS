@@ -69,13 +69,54 @@ class OdiaApp(App[Context | None]):
         color: $accent;
     }
 
-    .feature-grid, .summary-grid {
+    .feature-grid {
+        layout: grid;
+        grid-size: 3 1;
+        grid-gutter: 0 2;
+        width: 100%;
+        height: 10;
+        margin: 2 0;
+    }
+
+    .summary-grid {
         width: 100%;
         height: auto;
         margin: 2 0;
     }
 
-    .feature, .summary-device {
+    .feature {
+        width: 100%;
+        height: 100%;
+        padding: 0 2 1 2;
+        border: round $primary;
+        background: $boost;
+        text-align: center;
+    }
+
+    .feature-number {
+        width: 100%;
+        height: 3;
+        color: $accent;
+        text-align: center;
+    }
+
+    .feature-title {
+        width: 100%;
+        height: 1;
+        color: $text;
+        text-style: bold;
+        text-align: center;
+    }
+
+    .feature-copy {
+        width: 100%;
+        height: auto;
+        margin-top: 1;
+        color: $text-muted;
+        text-align: center;
+    }
+
+    .summary-device {
         width: 1fr;
         height: auto;
         margin: 0 1;

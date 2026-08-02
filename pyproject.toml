@@ -11,10 +11,12 @@ requires-python = ">=3.11,<3.12"
 dependencies = [
     "clip @ git+https://github.com/ultralytics/CLIP.git",
     "cv2-enumerate-cameras>=1.3.3",
+    "ipykernel>=7.3.0",
     "mlx-audio==0.4.6; sys_platform == 'darwin' and platform_machine == 'arm64'",
     "numpy>=2.4.6",
     "openai-whisper==20250625",
     "opencv-python==5.0.0.93",
+    "pandas>=3.0.5",
     "pyobjc-framework-avfoundation; sys_platform == 'darwin'",
     "pyobjc-framework-soundanalysis; sys_platform == 'darwin'",
     "pyttsx3==2.99",

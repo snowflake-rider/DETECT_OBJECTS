@@ -8,7 +8,7 @@ from unittest.mock import patch
 import cv2
 import numpy as np
 from cv2_enumerate_cameras.camera_info import CameraInfo
-from textual.widgets import Button, Checkbox, ProgressBar, Select, Static
+from textual.widgets import Button, Checkbox, Digits, Label, ProgressBar, Select, Static
 
 from detect_objects.device_setup import (
     AudioInput,
@@ -72,6 +72,12 @@ class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertIn("DEVICE SETUP", content)
             self.assertIn("hear, speak, and be seen", content)
+            numbers = [str(widget.value) for widget in app.screen.query(Digits)]
+            self.assertEqual(numbers, ["01", "02", "03"])
+            labels = " ".join(str(widget.content) for widget in app.screen.query(Label))
+            self.assertIn("AUDIO OUTPUT", labels)
+            self.assertIn("AUDIO INPUT", labels)
+            self.assertIn("VIDEO INPUT", labels)
             self.assertIsNotNone(app.screen.query_one("#begin-setup", Button))
 
     async def test_completes_output_input_camera_and_summary_flow(self) -> None:

@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 
 from detect_objects.models.model_config import AppleSoundAnalysisConfig
-from detect_objects.models.sound.apple_sound_analysis import (
+from prototypes.audio.apple_sound_analysis import (
     AppleSoundAnalysisClassifier,
     SoundAnalysis,
     _create_results_observer,
@@ -71,7 +71,7 @@ class AppleSoundAnalysisTests(unittest.TestCase):
         )
 
         with patch(
-            "detect_objects.models.sound.apple_sound_analysis.CoreMedia.CMTimeGetSeconds",
+            "prototypes.audio.apple_sound_analysis.CoreMedia.CMTimeGetSeconds",
             side_effect=float,
         ):
             observer.request_didProduceResult_(None, result)

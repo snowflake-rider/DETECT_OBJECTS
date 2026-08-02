@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 from typing import Any
 
-from ..model_config import AppleSoundAnalysisConfig
+from detect_objects.models.model_config import AppleSoundAnalysisConfig
 from .base import SoundPrediction, SoundWindow
 
 try:

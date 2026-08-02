@@ -87,5 +87,5 @@ temp/
 
 # Jupyter runtime and exported notebook output
 .ipynb_checkpoints/
-sound_model_notebooks/*.html
-sound_model_notebooks/*.pdf
+notebooks/sound_models/*.html
+notebooks/sound_models/*.pdf

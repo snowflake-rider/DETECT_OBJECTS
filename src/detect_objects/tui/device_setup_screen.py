@@ -8,12 +8,13 @@ from threading import Event
 import sounddevice as sd
 from textual import on, work
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Grid, Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.screen import Screen
 from textual.widgets import (
     Button,
     Checkbox,
+    Digits,
     Footer,
     Header,
     Label,
@@ -96,16 +97,21 @@ class WelcomeScreen(Screen[bool]):
                 "Three quick guided checks · about two minutes",
                 classes="hero-note",
             )
-            with Horizontal(classes="feature-grid"):
-                yield Static(
-                    "🔊\n[b]Sound[/b]\nChoose and verify output", classes="feature"
-                )
-                yield Static(
-                    "🎙\n[b]Voice[/b]\nRecord and hear yourself", classes="feature"
-                )
-                yield Static(
-                    "📷\n[b]Video[/b]\nSnapshot and live preview", classes="feature"
-                )
+            with Grid(classes="feature-grid"):
+                with Vertical(classes="feature"):
+                    yield Digits("01", classes="feature-number")
+                    yield Label("AUDIO OUTPUT", classes="feature-title")
+                    yield Static(
+                        "Choose and test\nyour speakers", classes="feature-copy"
+                    )
+                with Vertical(classes="feature"):
+                    yield Digits("02", classes="feature-number")
+                    yield Label("AUDIO INPUT", classes="feature-title")
+                    yield Static("Record and hear\nyourself", classes="feature-copy")
+                with Vertical(classes="feature"):
+                    yield Digits("03", classes="feature-number")
+                    yield Label("VIDEO INPUT", classes="feature-title")
+                    yield Static("Snapshot and\nlive preview", classes="feature-copy")
             yield Button(
                 "Begin Setup  →",
                 id="begin-setup",
