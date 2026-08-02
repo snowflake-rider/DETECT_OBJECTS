@@ -59,9 +59,13 @@ class YoloDetector:
         self,
         model_id: str,
         *,
+        supported_classes: Sequence[str] = DEFAULT_DETECTION_CLASSES,
         manager_factory: ManagerFactory = create_vision_manager,
     ) -> None:
         self._model_id = model_id
+        self._supported_classes = tuple(
+            dict.fromkeys((*DEFAULT_DETECTION_CLASSES, *supported_classes))
+        )
         self._manager_factory = manager_factory
         self._manager: VisionManager | None = None
 
@@ -77,9 +81,15 @@ class YoloDetector:
 
         manager = self._manager_factory(self._model_id)
         manager.load()
-        manager.cache_class_embeddings(DEFAULT_DETECTION_CLASSES)
+        manager.cache_class_embeddings(self._supported_classes)
         manager.activate_cached_classes(DEFAULT_DETECTION_CLASSES)
         self._manager = manager
+
+    def set_classes(self, classes: Sequence[str]) -> None:
+        """Switch detection to classes already cached during model loading."""
+        if not classes:
+            return
+        self._require_manager().activate_cached_classes(classes)
 
     def process(self, frame: np.ndarray) -> tuple[np.ndarray, list[Detection]]:
         """Predict and draw detections on one BGR camera frame."""

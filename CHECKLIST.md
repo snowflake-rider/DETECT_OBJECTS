@@ -1,5 +1,8 @@
 # Checklist
 
+- [ ] Statistical comparison for different vision models
+- [ ] Performance comparison between local and distributed execution
+
 ## Bootstrap
 
 - [ ] Conda choice portable
@@ -29,6 +32,7 @@
 
 ## Distributed test at home
 
+- [ ] Add a video streaming source for the app (e.g., YouTube or local MP4 playback)
 - [ ] Use this Mac for the camera and YOLO
 - [ ] Use `Kafka-MBP` for the microphone and Whisper
 - [ ] Clone the `uv-env` branch into `~/Git/Experiment/detect_objects` on `Kafka-MBP`

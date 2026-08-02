@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from queue import Empty, Full, Queue
 from threading import Event
 from typing import Protocol
 
@@ -36,6 +37,8 @@ class FrameDetector(Protocol):
 
     def load(self) -> None: ...
 
+    def set_classes(self, classes: tuple[str, ...]) -> None: ...
+
     def process(self, frame: np.ndarray) -> tuple[np.ndarray, list[Detection]]: ...
 
     def close(self) -> None: ...
@@ -66,6 +69,7 @@ class CameraVideoStream(QThread):
         self._capture_factory = capture_factory or cv2.VideoCapture
         self._detector = detector
         self._stop_requested = Event()
+        self._pending_classes: Queue[tuple[str, ...]] = Queue(maxsize=1)
 
     @property
     def is_running(self) -> bool:
@@ -84,6 +88,19 @@ class CameraVideoStream(QThread):
         self._stop_requested.set()
         if self.is_running and QThread.currentThread() is not self:
             self.wait()
+
+    def set_classes(self, classes: tuple[str, ...]) -> None:
+        """Schedule the latest requested detection classes for the worker."""
+        if not classes:
+            return
+        try:
+            self._pending_classes.put_nowait(classes)
+        except Full:
+            try:
+                self._pending_classes.get_nowait()
+            except Empty:
+                pass
+            self._pending_classes.put_nowait(classes)
 
     def run(self) -> None:
         """Own the OpenCV capture until stopped or a camera error occurs."""
@@ -107,6 +124,12 @@ class CameraVideoStream(QThread):
                     return
 
                 if self._detector is not None:
+                    try:
+                        classes = self._pending_classes.get_nowait()
+                    except Empty:
+                        classes = None
+                    if classes is not None:
+                        self._detector.set_classes(classes)
                     frame, detections = self._detector.process(frame)
                     summary = " · ".join(
                         format_detection_label(

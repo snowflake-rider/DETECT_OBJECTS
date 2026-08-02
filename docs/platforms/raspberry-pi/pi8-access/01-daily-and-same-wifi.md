@@ -1,8 +1,8 @@
-# Daily Access and Same-Wi-Fi Access
+# Daily and Same-Wi-Fi Access
 
-> [Back to the Pi8 Access Runbook](README.md)
+> [Back to Pi8 Access](README.md)
 
-## Recommended: access through Tailscale
+## Recommended: Tailscale
 
 Run on the Mac:
 
@@ -10,45 +10,16 @@ Run on the Mac:
 ssh pi8
 ```
 
-Confirm that the session reached the intended Pi:
+Check that you reached the correct Pi:
 
 ```bash
 hostname
 whoami
-tailscale ip -4
 ```
 
-Expected hostname and user:
-
-```text
-pi8
-pi8
-```
-
-The Mac SSH configuration resolves the short alias to the Pi's Tailscale
-MagicDNS name:
-
-```sshconfig
-Host pi8 pi1 pi8.local
-  HostName pi8.tail34aafe.ts.net
-  AddressFamily inet
-  User pi8
-  IdentityFile ~/.ssh/rpi_one_key
-  IdentitiesOnly yes
-  AddKeysToAgent yes
-  UseKeychain yes
-```
-
-Inspect the effective configuration without connecting:
-
-```bash
-ssh -G pi8 | awk '$1 == "hostname" || $1 == "user" || $1 == "identityfile" {print}'
-```
+Both should print `pi8`.
 
 ## Same Wi-Fi without Tailscale
-
-Use this fallback when both devices are on the same ordinary LAN and local
-device-to-device traffic is permitted:
 
 ```bash
 ssh -4 -F /dev/null \
@@ -56,32 +27,15 @@ ssh -4 -F /dev/null \
   pi8@pi8.local
 ```
 
-`-F /dev/null` is important in the current setup. It bypasses the `pi8.local`
-alias in `~/.ssh/config`, allowing Bonjour to resolve the Pi's local address.
+`-F /dev/null` ignores the `pi8.local` alias in the Mac SSH configuration and
+lets Bonjour find the local Pi.
 
-To inspect local resolution on macOS:
-
-```bash
-dscacheutil -q host -a name pi8.local
-ping -c 2 pi8.local
-```
-
-## When same Wi-Fi is not enough
-
-Local access can fail even when both devices show the same Wi-Fi name. Guest
-networks, corporate networks, and phone hotspots can isolate clients or block
-Bonjour multicast. Use `ssh pi8` through Tailscale in those environments.
+This may fail on guest Wi-Fi, company networks, or phone hotspots that block
+devices from talking to each other. Use `ssh pi8` when that happens.
 
 ## Copy files
 
-Copy a file to the Pi through the configured alias:
-
 ```bash
 scp ./example.txt pi8:~/
-```
-
-Copy a directory:
-
-```bash
 scp -r ./example-directory pi8:~/
 ```

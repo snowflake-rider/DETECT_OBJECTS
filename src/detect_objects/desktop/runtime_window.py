@@ -18,15 +18,17 @@ from PySide6.QtWidgets import (
 
 from ..device_setup.context import Context
 from ..models.catalog import get_model_option
+from ..voice_text_convert.parse_and_match_module import Text_Manager
 from .camera_video import CameraVideoStream
 from .fake_video import FakeVideoStream
+from .whisper_stream import WhisperStream
 from .yolo_detection import YoloDetector
 
 VideoStream = FakeVideoStream | CameraVideoStream
 
 
 class RuntimeWindow(QMainWindow):
-    """Present the first hardware-free desktop dashboard shell."""
+    """Present live vision, voice control, and typed object instructions."""
 
     command_submitted = Signal(str)
     quit_requested = Signal()
@@ -39,6 +41,9 @@ class RuntimeWindow(QMainWindow):
         super().__init__()
         self._context = context
         self._current_frame: QImage | None = None
+        self._text_manager_context = Text_Manager()
+        self._text_manager = self._text_manager_context.__enter__()
+        supported_classes = self._text_manager.get_supported_yolo_classes()
         if video_stream is not None:
             self._video_stream = video_stream
         elif context is not None:
@@ -47,11 +52,23 @@ class RuntimeWindow(QMainWindow):
                 index=camera.index,
                 backend=camera.backend,
                 name=camera.name,
-                detector=YoloDetector(context.models.vision_id),
+                detector=YoloDetector(
+                    context.models.vision_id,
+                    supported_classes=supported_classes,
+                ),
                 parent=self,
             )
         else:
             self._video_stream = FakeVideoStream(parent=self)
+        self._whisper_stream = (
+            WhisperStream(
+                model_id=context.models.voice_id,
+                device_id=context.audio_input.info.index,
+                parent=self,
+            )
+            if context is not None
+            else None
+        )
         self.setWindowTitle("ODIA Live")
         self.resize(1280, 800)
         self.setMinimumSize(900, 620)
@@ -61,6 +78,11 @@ class RuntimeWindow(QMainWindow):
         self._video_stream.error.connect(self.show_video_error)
         self._video_stream.model_status.connect(self.show_model_status)
         self._video_stream.detections_ready.connect(self.show_detections)
+        if self._whisper_stream is not None:
+            self._whisper_stream.status_changed.connect(self.show_whisper_status)
+            self._whisper_stream.transcript_ready.connect(self.receive_transcript)
+            self._whisper_stream.error.connect(self.show_whisper_error)
+            self._whisper_stream.finished.connect(self._whisper_finished)
         self._video_stream.start()
         QTimer.singleShot(0, self._refresh_video_panel)
 
@@ -85,7 +107,7 @@ class RuntimeWindow(QMainWindow):
         rail.setObjectName("top-rail")
         layout = QVBoxLayout(rail)
         layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(8)
+        layout.setSpacing(12)
 
         primary_row = QHBoxLayout()
         primary_row.setSpacing(12)
@@ -110,58 +132,120 @@ class RuntimeWindow(QMainWindow):
         primary_row.addWidget(quit_button)
         layout.addLayout(primary_row)
 
-        device_row = QHBoxLayout()
-        device_row.setSpacing(18)
         if self._context is not None:
             camera = self._context.camera.info
-            camera_selection = QLabel(f"Camera: {camera.name} (index {camera.index})")
-            audio_input_selection = QLabel(
-                f"Audio input: {self._context.audio_input.info.name}"
-            )
-            audio_output_selection = QLabel(
-                f"Audio output: {self._context.audio_output.info.name}"
+            camera_name = f"{camera.name} · index {camera.index}"
+            yolo_name = get_model_option(
+                self._context.models.vision_id,
+                kind="vision",
+            ).name
+            whisper_name = get_model_option(
+                self._context.models.voice_id,
+                kind="voice",
+            ).name
+            yolo_status = "Not started"
+        else:
+            camera_name = "Synthetic preview"
+            yolo_name = "Simulation"
+            whisper_name = "No setup context"
+            yolo_status = "Simulation ready"
+
+        dashboard = QHBoxLayout()
+        dashboard.setSpacing(10)
+        dashboard.addWidget(
+            self._build_status_card(
+                title="CAMERA",
+                value=camera_name,
+                value_name="camera-selection",
+                status="Opening selected device…",
+                status_name="camera-runtime-status",
+            ),
+            stretch=1,
+        )
+        dashboard.addWidget(
+            self._build_status_card(
+                title="YOLO VISION",
+                value=yolo_name,
+                value_name="yolo-model",
+                status=yolo_status,
+                status_name="yolo-status",
+            ),
+            stretch=1,
+        )
+        dashboard.addWidget(self._build_whisper_card(whisper_name), stretch=1)
+        layout.addLayout(dashboard)
+
+        if self._context is not None:
+            devices = QLabel(
+                f"MIC  {self._context.audio_input.info.name}"
+                f"     •     OUTPUT  {self._context.audio_output.info.name}"
             )
         else:
-            camera_selection = QLabel("Camera: Synthetic preview")
-            audio_input_selection = QLabel("Audio input: Not connected")
-            audio_output_selection = QLabel("Audio output: Not connected")
-
-        for label, object_name in (
-            (camera_selection, "camera-selection"),
-            (audio_input_selection, "audio-input-selection"),
-            (audio_output_selection, "audio-output-selection"),
-        ):
-            label.setObjectName(object_name)
-            label.setToolTip(label.text())
-            device_row.addWidget(label)
-        device_row.addStretch()
-        layout.addLayout(device_row)
-
-        status_row = QHBoxLayout()
-        status_row.setSpacing(18)
-        yolo_name = ""
-        whisper_name = ""
-        if self._context is not None:
-            yolo_name = (
-                get_model_option(self._context.models.vision_id, kind="vision").name
-                + " · "
-            )
-            whisper_name = (
-                get_model_option(self._context.models.voice_id, kind="voice").name
-                + " · "
-            )
-
-        yolo_status = QLabel(f"YOLO: {yolo_name}Not started")
-        yolo_status.setObjectName("yolo-status")
-        status_row.addWidget(yolo_status)
-
-        whisper_status = QLabel(f"Whisper: {whisper_name}Not started")
-        whisper_status.setObjectName("whisper-status")
-        status_row.addWidget(whisper_status)
-        status_row.addStretch()
-        layout.addLayout(status_row)
+            devices = QLabel("MIC  Not connected     •     OUTPUT  Not connected")
+        devices.setObjectName("audio-device-summary")
+        devices.setToolTip(devices.text())
+        layout.addWidget(devices)
 
         return rail
+
+    @staticmethod
+    def _build_status_card(
+        *,
+        title: str,
+        value: str,
+        value_name: str,
+        status: str,
+        status_name: str,
+    ) -> QFrame:
+        card = QFrame()
+        card.setObjectName("status-card")
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(4)
+
+        heading = QLabel(title)
+        heading.setObjectName("status-heading")
+        layout.addWidget(heading)
+
+        value_label = QLabel(value)
+        value_label.setObjectName(value_name)
+        value_label.setToolTip(value)
+        layout.addWidget(value_label)
+
+        status_label = QLabel(status)
+        status_label.setObjectName(status_name)
+        layout.addWidget(status_label)
+        return card
+
+    def _build_whisper_card(self, model_name: str) -> QFrame:
+        card = QFrame()
+        card.setObjectName("status-card")
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(12, 8, 10, 8)
+        layout.setSpacing(3)
+
+        heading_row = QHBoxLayout()
+        heading = QLabel("WHISPER VOICE")
+        heading.setObjectName("status-heading")
+        heading_row.addWidget(heading)
+        heading_row.addStretch()
+
+        toggle = QPushButton("Start listening")
+        toggle.setObjectName("toggle-whisper")
+        toggle.clicked.connect(self._toggle_whisper)
+        toggle.setEnabled(self._whisper_stream is not None)
+        heading_row.addWidget(toggle)
+        layout.addLayout(heading_row)
+
+        model = QLabel(model_name)
+        model.setObjectName("whisper-model")
+        model.setToolTip(model_name)
+        layout.addWidget(model)
+
+        status = QLabel("Off" if self._whisper_stream is not None else "Unavailable")
+        status.setObjectName("whisper-status")
+        layout.addWidget(status)
+        return card
 
     def _build_video_panel(self) -> QLabel:
         video_panel = QLabel("Camera preview will appear here")
@@ -194,11 +278,21 @@ class RuntimeWindow(QMainWindow):
         detection_row.addWidget(detection_summary, stretch=1)
         layout.addLayout(detection_row)
 
+        target_row = QHBoxLayout()
+        target_heading = QLabel("TARGETS")
+        target_heading.setObjectName("rail-label")
+        target_row.addWidget(target_heading)
+        targets = QLabel("cell phone · clock · keyboard · person")
+        targets.setObjectName("target-summary")
+        targets.setWordWrap(True)
+        target_row.addWidget(targets, stretch=1)
+        layout.addLayout(target_row)
+
         transcript_row = QHBoxLayout()
-        transcript_heading = QLabel("HEARD")
+        transcript_heading = QLabel("INSTRUCTION")
         transcript_heading.setObjectName("rail-label")
         transcript_row.addWidget(transcript_heading)
-        transcript = QLabel("No transcript yet")
+        transcript = QLabel("Speak with Whisper or type below")
         transcript.setObjectName("transcript")
         transcript.setWordWrap(True)
         transcript_row.addWidget(transcript, stretch=1)
@@ -207,7 +301,9 @@ class RuntimeWindow(QMainWindow):
         command_row = QHBoxLayout()
         command_input = QLineEdit()
         command_input.setObjectName("command-input")
-        command_input.setPlaceholderText("Type a detection command…")
+        command_input.setPlaceholderText(
+            "Type an object instruction, for example: 사람을 찾아줘"
+        )
         command_input.returnPressed.connect(self._submit_command)
         command_row.addWidget(command_input, stretch=1)
 
@@ -225,9 +321,50 @@ class RuntimeWindow(QMainWindow):
         if not command:
             return
 
-        self.findChild(QLabel, "transcript").setText(f"Typed command: {command}")
+        self._apply_instruction(command, source="Typed")
         command_input.clear()
         self.command_submitted.emit(command)
+
+    def _apply_instruction(self, text: str, *, source: str) -> None:
+        """Parse typed or spoken text and switch YOLO to matching classes."""
+        self.findChild(QLabel, "transcript").setText(f"{source}: {text}")
+        try:
+            detected_classes = self._text_manager.extract(text)
+        except (RuntimeError, ValueError) as error:
+            self.findChild(QLabel, "target-summary").setText(
+                f"Could not parse instruction: {error}"
+            )
+            return
+
+        classes = tuple(
+            dict.fromkeys(detected.yolo_class for detected in detected_classes)
+        )
+        if not classes:
+            self.findChild(QLabel, "target-summary").setText(
+                "No supported object found; current targets unchanged"
+            )
+            return
+
+        self._video_stream.set_classes(classes)
+        self.findChild(QLabel, "target-summary").setText(" · ".join(classes))
+
+    @Slot(str)
+    def receive_transcript(self, transcript: str) -> None:
+        """Route recognized speech through the same path as typed input."""
+        self._apply_instruction(transcript, source="Heard")
+
+    def _toggle_whisper(self) -> None:
+        if self._whisper_stream is None:
+            return
+
+        button = self.findChild(QPushButton, "toggle-whisper")
+        if self._whisper_stream.is_running:
+            button.setEnabled(False)
+            self._whisper_stream.stop()
+            return
+
+        button.setText("Stop listening")
+        self._whisper_stream.start()
 
     def _toggle_preview(self) -> None:
         preview_button = self.findChild(QPushButton, "toggle-preview")
@@ -235,16 +372,20 @@ class RuntimeWindow(QMainWindow):
             self._video_stream.stop()
             preview_button.setText("Resume")
             self.findChild(QLabel, "live-status").setText("● PAUSED")
+            self.findChild(QLabel, "camera-runtime-status").setText("Paused")
+            self.findChild(QLabel, "yolo-status").setText("Stopped")
             return
 
         self._video_stream.start()
         preview_button.setText("Pause")
         self.findChild(QLabel, "live-status").setText("● LIVE")
+        self.findChild(QLabel, "camera-runtime-status").setText("Opening…")
 
     @Slot(QImage)
     def display_frame(self, image: QImage) -> None:
         """Replace the video panel with the latest available image."""
         self._current_frame = image
+        self.findChild(QLabel, "camera-runtime-status").setText("Streaming")
         self._refresh_video_panel()
 
     @Slot(str)
@@ -258,17 +399,39 @@ class RuntimeWindow(QMainWindow):
         video_panel.setText(f"Camera preview unavailable\n{message}")
         self.findChild(QPushButton, "toggle-preview").setText("Resume")
         self.findChild(QLabel, "live-status").setText("● ERROR")
+        self.findChild(QLabel, "camera-runtime-status").setText("Error")
+        self.findChild(QLabel, "camera-runtime-status").setToolTip(message)
+        self.findChild(QLabel, "yolo-status").setText("Stopped")
 
     @Slot(str)
     def show_model_status(self, status: str) -> None:
         """Present YOLO loading and accelerator status."""
-        model_name = ""
-        if self._context is not None:
-            model_name = (
-                get_model_option(self._context.models.vision_id, kind="vision").name
-                + " · "
-            )
-        self.findChild(QLabel, "yolo-status").setText(f"YOLO: {model_name}{status}")
+        self.findChild(QLabel, "yolo-status").setText(status)
+
+    @Slot(str)
+    def show_whisper_status(self, status: str) -> None:
+        """Show whether Whisper is loading, listening, stopping, or off."""
+        self.findChild(QLabel, "whisper-status").setText(status)
+        button = self.findChild(QPushButton, "toggle-whisper")
+        if status == "Listening":
+            button.setText("Stop listening")
+        elif status in {"Off", "Error"}:
+            button.setText("Start listening")
+            button.setEnabled(False)
+
+    @Slot(str)
+    def show_whisper_error(self, message: str) -> None:
+        """Keep the desktop open and retain Whisper failure details."""
+        status = self.findChild(QLabel, "whisper-status")
+        status.setText("Error")
+        status.setToolTip(message)
+        self.findChild(QLabel, "transcript").setText(message)
+
+    @Slot()
+    def _whisper_finished(self) -> None:
+        button = self.findChild(QPushButton, "toggle-whisper")
+        button.setText("Start listening")
+        button.setEnabled(True)
 
     @Slot(int, str)
     def show_detections(self, count: int, summary: str) -> None:
@@ -304,8 +467,12 @@ class RuntimeWindow(QMainWindow):
         QTimer.singleShot(0, self._refresh_video_panel)
 
     def closeEvent(self, event: QCloseEvent) -> None:
-        """Stop the preview timer before the window closes."""
+        """Release camera, Whisper, and parser resources before closing."""
         self._video_stream.stop()
+        if self._whisper_stream is not None:
+            self._whisper_stream.stop()
+            self._whisper_stream.wait()
+        self._text_manager_context.__exit__(None, None, None)
         super().closeEvent(event)
 
     @staticmethod
@@ -321,6 +488,11 @@ class RuntimeWindow(QMainWindow):
             border: 1px solid #272c34;
             border-radius: 8px;
         }
+        QFrame#status-card {
+            background: #171b21;
+            border: 1px solid #2c323b;
+            border-radius: 7px;
+        }
         QLabel#brand {
             color: #f2a33a;
             font-size: 22px;
@@ -332,13 +504,29 @@ class RuntimeWindow(QMainWindow):
             font-size: 13px;
             font-weight: 700;
         }
+        QLabel#status-heading {
+            color: #8e97a6;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 1px;
+        }
         QLabel#camera-selection,
-        QLabel#audio-input-selection,
-        QLabel#audio-output-selection,
+        QLabel#yolo-model,
+        QLabel#whisper-model {
+            color: #e8ecf2;
+            font-size: 13px;
+            font-weight: 700;
+        }
+        QLabel#camera-runtime-status,
         QLabel#yolo-status,
         QLabel#whisper-status {
-            color: #8e97a6;
-            font-size: 12px;
+            color: #49c98b;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        QLabel#audio-device-summary {
+            color: #747e8d;
+            font-size: 11px;
         }
         QLabel#video-panel {
             background: #050608;
@@ -360,6 +548,10 @@ class RuntimeWindow(QMainWindow):
         }
         QLabel#detection-summary {
             color: #f2a33a;
+            font-weight: 700;
+        }
+        QLabel#target-summary {
+            color: #67c7d4;
             font-weight: 700;
         }
         QLabel#transcript {
@@ -392,6 +584,18 @@ class RuntimeWindow(QMainWindow):
             background: #c77e25;
             border-color: #f2a33a;
             color: #111419;
+        }
+        QPushButton#toggle-whisper {
+            background: #17343a;
+            border-color: #2c6973;
+            color: #8ee0ea;
+            padding: 5px 9px;
+            font-size: 11px;
+        }
+        QPushButton#toggle-whisper:disabled {
+            background: #20242a;
+            border-color: #30353d;
+            color: #68717d;
         }
         QPushButton#quit-runtime {
             background: #d64550;

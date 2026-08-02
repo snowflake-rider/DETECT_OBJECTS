@@ -1,33 +1,15 @@
-# Direct Ethernet Access
+# Direct Ethernet
 
-> [Back to the Pi8 Access Runbook](README.md)
+> [Back to Pi8 Access](README.md)
 
-Use a direct cable when Wi-Fi or Tailscale is unavailable. This method does not
-require internet access.
+Use this when Wi-Fi and Tailscale are unavailable. Internet is not required.
 
 ## Connect
 
 1. Power on the Pi.
-2. Connect the Pi's Ethernet port to the Mac's USB or Thunderbolt Ethernet
-   adapter.
-3. Wait approximately 30 seconds for link-local IPv6 and Bonjour discovery.
-4. On the Mac, check that the adapter reports an active link:
-
-```bash
-ifconfig | grep -B 5 -A 3 'status: active'
-```
-
-Discover the Pi over Bonjour:
-
-```bash
-dns-sd -G v4v6 pi8.local
-```
-
-Stop `dns-sd` with Control-C after it reports an address.
-
-## Connect over link-local IPv6
-
-Run:
+2. Connect the Pi to the Mac with an Ethernet adapter.
+3. Wait about 30 seconds.
+4. Run on the Mac:
 
 ```bash
 ssh -6 -F /dev/null \
@@ -35,20 +17,17 @@ ssh -6 -F /dev/null \
   pi8@pi8.local
 ```
 
-The direct link previously worked even when the Mac and Pi had incompatible
-IPv4 addresses because IPv6 link-local discovery supplied the correct network
-interface scope automatically.
+This uses local IPv6 and Bonjour.
 
-## Optional IPv4 fallback
+## IPv4 fallback
 
-The Pi's Ethernet profile currently uses `10.10.16.72`. If IPv6 discovery does
-not work, temporarily configure the Mac's USB Ethernet service with:
+If IPv6 does not work, temporarily configure the Mac Ethernet adapter:
 
 - Address: `10.10.16.73`
 - Subnet mask: `255.255.255.0`
-- Router: leave blank
+- Router: blank
 
-Then connect with:
+Then connect:
 
 ```bash
 ssh -F /dev/null \
@@ -56,25 +35,17 @@ ssh -F /dev/null \
   pi8@10.10.16.72
 ```
 
-Restore the Mac Ethernet service to DHCP after recovery unless the manual
-address is intentionally permanent.
+Return the Mac adapter to DHCP afterward.
 
 ## Restore remote access
 
-Once connected by cable:
+On the Pi:
 
 ```bash
 nmcli device status
-nmcli connection show --active
-systemctl status ssh --no-pager
-systemctl status tailscaled --no-pager
+systemctl is-active ssh
+systemctl is-active tailscaled
+tailscale status
 ```
 
-Bring up a saved Wi-Fi profile if necessary:
-
-```bash
-sudo nmcli connection up "VEEWORK02_KT5G" ifname wlan0
-```
-
-Switching Wi-Fi can briefly interrupt Tailscale. Keep the Ethernet session open
-until `tailscale status` reports that the Pi is online again.
+Keep Ethernet connected until Wi-Fi and Tailscale are working again.

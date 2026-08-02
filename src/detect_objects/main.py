@@ -1,5 +1,41 @@
 """Start device setup, prepare the models, and run ODIA."""
 
+# CLASSIC MODE: COMPLETE WORKFLOW
+# 1. run_app() collects the user's setup choices in context.
+# 2. LocalRuntime(context) creates the runtime's starting state.
+# 3. runtime.prepare() validates classes and prepares models and devices.
+# 4. runtime.run() starts Whisper on a voice thread and YOLO on the main thread.
+# 5. Whisper converts speech to class names and puts them in a queue.
+# 6. The camera reads the queue and tells YOLO which classes to detect.
+# 7. runtime.close() stops both sides and releases every resource.
+#
+# python -m detect_objects
+#          |
+#          v
+#     __main__.py
+#          |
+#          v
+#       main.py ---- Desktop selected ----> Desktop application
+#          |
+#     Classic selected
+#          |
+#          v
+#    LocalRuntime.prepare()
+#          |
+#          v
+#    LocalRuntime.run()
+#          |
+#          +-----------------------+
+#          |                       |
+#          v                       v
+#   Voice thread              Main thread
+#   Whisper                   Camera + YOLO
+#          |                       ^
+#          +---- class queue ------+
+#                  |
+#                  v
+#         LocalRuntime.close()
+
 # Context stores the choices made on the setup screens.
 from .device_setup.context import Context
 

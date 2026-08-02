@@ -89,6 +89,12 @@ class Camera_Manager:
 
     def _apply_latest_classes(self) -> None:
         """Apply the newest class request by swapping cached embeddings."""
+        # ⭐ VOICE MAILBOX PROCESS
+        # The voice thread puts new instructions here, for example:
+        #     (["cup"], requested_at)
+        # The camera thread checks the mailbox before detecting each frame.
+        # The queue stores only new instructions, not YOLO's current setting.
+
         # Some camera uses may not have a voice-request mailbox.
         if self.__class_names_queue is None:
             return
@@ -96,23 +102,26 @@ class Camera_Manager:
         # Start with no request received for this camera frame.
         latest_request = None
 
-        # Remove available requests without waiting.
+        # get_nowait() removes one request immediately; it never waits for one.
         # If several exist, the last one removed is the newest one.
         while True:
             try:
                 latest_request = self.__class_names_queue.get_nowait()
             except queue.Empty:
-                # Empty is normal: there are no more requests to read now.
+                # Empty is normal. It means "no new voice instruction."
+                # It does not erase the classes YOLO is already detecting.
                 break
 
-        # Keep using the current YOLO classes if Whisper sent nothing new.
+        # Example: YOLO was detecting ["cup"] and the queue is now empty.
+        # Keep detecting ["cup"] until voice sends another instruction.
         if latest_request is None:
             return
 
         # Separate the queue item into its class list and creation time.
         new_classes, requested_at = latest_request
 
-        # Tell YOLO to detect the newly requested classes.
+        # A new instruction exists, so replace YOLO's current classes.
+        # Example: ["cup"] becomes ["dog"]. Future frames detect dogs.
         self.__yolo_world_manager.activate_cached_classes(new_classes)
         self.__classes = new_classes
         print(
@@ -133,7 +142,11 @@ class Camera_Manager:
             raise RuntimeError(f"camera index {self.__camera_index} is unavailable!")
 
         while not self.__thread_event.is_set():
-            # Read one image frame from the camera.
+            # Every loop follows this order:
+            # 1. Read one camera frame.
+            # 2. Check the voice mailbox.
+            # 3. Apply new classes if a request exists.
+            # 4. Run YOLO with the current classes.
             is_success, frame = self.__manager_obj.read()
             if not is_success:
                 print("cannot read frame")
@@ -143,6 +156,8 @@ class Camera_Manager:
             # Apply changes between frames, never during predict().
             self._apply_latest_classes()
             frame_height, frame_width = frame.shape[:2]
+
+            # If the mailbox was empty, YOLO still remembers its old classes.
             boxes, names = self.__yolo_world_manager.predict(frame=frame)
             # YOLO returns normalized coordinates; OpenCV drawing functions
             # require integer pixel coordinates in the current frame.

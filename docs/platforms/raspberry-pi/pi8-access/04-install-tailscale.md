@@ -1,53 +1,24 @@
-# Install and Authorize Tailscale
+# Install Tailscale
 
-> [Back to the Pi8 Access Runbook](README.md)
+> [Back to Pi8 Access](README.md)
 
-Tailscale allows the Mac to reach the Pi when they are on different networks.
-It supplies connectivity; the Pi's normal OpenSSH server still performs user
-and SSH-key authentication.
+These commands are for Debian 13 `trixie`. For another OS, use the
+[official Linux instructions](https://tailscale.com/docs/install/linux).
 
-Official references:
-
-- [Install Tailscale on Linux](https://tailscale.com/docs/install/linux)
-- [Stable package repository](https://pkgs.tailscale.com/stable/)
-- [MagicDNS](https://tailscale.com/docs/features/magicdns)
-
-These commands target Debian 13 `trixie`, which is the current operating system
-on `pi8`. For another distribution or release, use the matching repository from
-the official package page.
-
-## 1. Confirm internet access
-
-On the Pi:
+## 1. Confirm the Pi version
 
 ```bash
 . /etc/os-release
 printf '%s %s\n' "$ID" "$VERSION_CODENAME"
 dpkg --print-architecture
-ip route
-ping -c 2 1.1.1.1
 ```
 
-Expected distribution codename and architecture are `trixie` and `arm64`.
+Expected: Debian, `trixie`, and `arm64`.
 
-## 2. Back up an existing repository configuration
+## 2. Add the Tailscale repository
 
-Run these only if the target files already exist:
-
-```bash
-stamp=$(date +%Y%m%d-%H%M%S)
-sudo cp -a /usr/share/keyrings/tailscale-archive-keyring.gpg \
-  "/usr/share/keyrings/tailscale-archive-keyring.gpg.bak.$stamp"
-sudo cp -a /etc/apt/sources.list.d/tailscale.list \
-  "/etc/apt/sources.list.d/tailscale.list.bak.$stamp"
-```
-
-On a fresh install, both files are normally absent and no backup is needed.
-
-## 3. Add the official stable repository
-
-This method downloads repository metadata without piping an installer script
-into a shell:
+If the keyring or repository file already exists, back it up before replacing
+it.
 
 ```bash
 sudo install -d -m 0755 /usr/share/keyrings
@@ -65,71 +36,44 @@ sudo chmod 0644 \
   /etc/apt/sources.list.d/tailscale.list
 ```
 
-## 4. Install and start Tailscale
+## 3. Install and authorize
 
 ```bash
 sudo apt update
 sudo apt install tailscale
 sudo systemctl enable --now tailscaled
+sudo tailscale up
 ```
+
+Open the URL printed by `tailscale up` and approve the Pi.
 
 Verify:
 
 ```bash
-tailscale version
-systemctl is-enabled tailscaled
-systemctl is-active tailscaled
-```
-
-## 5. Authorize the Pi
-
-```bash
-sudo tailscale up
-```
-
-Open the one-time URL printed by the command. Sign in with the same Tailscale
-account used by the Mac and approve the Pi.
-
-Verify the result:
-
-```bash
 tailscale status
 tailscale ip -4
-tailscale status --json | grep -m1 '"DNSName"'
 ```
 
-For the current Pi, the expected identity is:
-
-```text
-pi8.tail34aafe.ts.net
-100.109.1.106
-```
-
-## 6. Test from the Mac
+## 4. Test from the Mac
 
 ```bash
-/Applications/Tailscale.app/Contents/MacOS/Tailscale status
 /Applications/Tailscale.app/Contents/MacOS/Tailscale ping pi8
-```
 
-Test standard OpenSSH through the tailnet before changing aliases:
-
-```bash
 ssh -4 -F /dev/null \
   -i ~/.ssh/rpi_one_key \
   pi8@pi8.tail34aafe.ts.net
 ```
 
-## 7. Configure the short SSH alias
+## 5. Add the short SSH name
 
-Back up the Mac config:
+Back up the Mac SSH configuration:
 
 ```bash
 cp -p ~/.ssh/config \
   "$HOME/.ssh/config.bak.$(date +%Y%m%d-%H%M%S)"
 ```
 
-Then ensure `~/.ssh/config` contains a `pi8` entry using the MagicDNS name:
+Then add this to `~/.ssh/config`:
 
 ```sshconfig
 Host pi8
@@ -142,21 +86,14 @@ Host pi8
   UseKeychain yes
 ```
 
-Test:
+Then test:
 
 ```bash
-ssh -G pi8 | grep -E '^(hostname|user|identityfile) '
 ssh pi8
 ```
 
-## Reauthorization
-
-If the Pi's Tailscale key expires or its machine authorization is removed:
+To reauthorize an expired or removed device:
 
 ```bash
 sudo tailscale up --force-reauth
 ```
-
-Do not disable key expiry globally merely to avoid maintenance. Reauthorize the
-device or deliberately adjust the policy for a trusted, physically protected
-device.

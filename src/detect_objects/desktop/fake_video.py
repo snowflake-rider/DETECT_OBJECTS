@@ -105,6 +105,9 @@ class FakeVideoStream(QObject):
         """Stop producing new frames."""
         self._timer.stop()
 
+    def set_classes(self, classes: tuple[str, ...]) -> None:
+        """Accept instruction updates when the UI uses its synthetic preview."""
+
     def _emit_frame(self) -> None:
         frame = create_fake_frame(self._frame_number)
         self._frame_number += 1

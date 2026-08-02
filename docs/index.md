@@ -5,6 +5,10 @@ Project-wide documentation is grouped here by purpose.
 ## Roadmap
 
 
+## Learning
+
+- [Learn the ODIA architecture](learning/odia-architecture/README.md)
+
 ## Audio research
 
 - [Audio detection and separation](research/audio.md)
