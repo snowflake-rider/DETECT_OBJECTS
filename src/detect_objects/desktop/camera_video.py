@@ -53,6 +53,7 @@ class CameraVideoStream(QThread):
     detections_ready = Signal(int, str)
     keyword_queue_changed = Signal(object)
     active_classes_changed = Signal(object)
+    detection_frame_ready = Signal(QImage, object)
 
     def __init__(
         self,
@@ -137,6 +138,7 @@ class CameraVideoStream(QThread):
                         self.error.emit("Camera stopped providing frames.")
                     return
 
+                detections: list[Detection] = []
                 if self._detector is not None:
                     with self._pending_classes_lock:
                         try:
@@ -162,7 +164,10 @@ class CameraVideoStream(QThread):
                         len(detections),
                         summary or "No objects",
                     )
-                self.frame_ready.emit(frame_to_qimage(frame))
+                image = frame_to_qimage(frame)
+                self.frame_ready.emit(image)
+                if detections:
+                    self.detection_frame_ready.emit(image, detections)
         except (cv2.error, OSError, RuntimeError, TypeError, ValueError) as error:
             self.error.emit(f"Desktop preview failed: {error}")
         finally:

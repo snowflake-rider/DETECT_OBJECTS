@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "story": {
+      "type": "string"
+    },
+    "representative_image": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "story",
+    "representative_image"
+  ],
+  "additionalProperties": false
+}

@@ -75,6 +75,7 @@ class FakeVideoStream(QObject):
     detections_ready = Signal(int, str)
     keyword_queue_changed = Signal(object)
     active_classes_changed = Signal(object)
+    detection_frame_ready = Signal(QImage, object)
 
     def __init__(self, *, fps: int = 12, parent: QObject | None = None) -> None:
         super().__init__(parent)

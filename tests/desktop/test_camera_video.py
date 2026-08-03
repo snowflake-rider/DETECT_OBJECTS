@@ -121,6 +121,7 @@ class CameraVideoStreamTests(unittest.TestCase):
         detector = MemoryDetector()
         model_statuses = []
         detection_summaries = []
+        detection_frames = []
         stream = CameraVideoStream(
             index=3,
             backend=1200,
@@ -131,6 +132,9 @@ class CameraVideoStreamTests(unittest.TestCase):
         stream.model_status.connect(lambda status: model_statuses.append(status))
         stream.detections_ready.connect(
             lambda count, summary: detection_summaries.append((count, summary))
+        )
+        stream.detection_frame_ready.connect(
+            lambda image, detections: detection_frames.append((image, detections))
         )
 
         stream.start()
@@ -143,6 +147,10 @@ class CameraVideoStreamTests(unittest.TestCase):
         self.assertTrue(detector.closed)
         self.assertIn("Ready · Test accelerator", model_statuses)
         self.assertIn((1, "PERSON 88%"), detection_summaries)
+        self.assertGreaterEqual(len(detection_frames), 1)
+        image, detections = detection_frames[0]
+        self.assertFalse(image.isNull())
+        self.assertEqual(detections[0].class_name, "person")
 
     def test_keyword_queue_reports_pending_and_activated_classes(self) -> None:
         capture = MemoryCapture(np.zeros((4, 4, 3), dtype=np.uint8))

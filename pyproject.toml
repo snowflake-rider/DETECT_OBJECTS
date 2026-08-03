@@ -41,6 +41,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "detect_objects.voice_text_convert" = ["*.json"]
+"detect_objects.story" = ["*.json"]
 
 [dependency-groups]
 dev = [

@@ -18,6 +18,10 @@ from PySide6.QtWidgets import (
 
 from ..device_setup.context import Context
 from ..models.catalog import get_model_option
+from ..paths import PROJECT_ROOT
+from ..story.generator import CodexStoryGenerator, StoryGenerator, StoryResult
+from ..story.session import SessionRecorder
+from ..story.worker import StoryWorker
 from ..voice_text_convert.parse_and_match_module import Text_Manager
 from .camera_video import CameraVideoStream
 from .fake_video import FakeVideoStream
@@ -37,11 +41,18 @@ class RuntimeWindow(QMainWindow):
         self,
         context: Context | None = None,
         video_stream: VideoStream | None = None,
+        session_recorder: SessionRecorder | None = None,
+        story_generator: StoryGenerator | None = None,
     ) -> None:
         super().__init__()
         self._context = context
         self._current_frame: QImage | None = None
         self._last_queued_classes: tuple[str, ...] = ()
+        self._session_recorder = session_recorder or SessionRecorder(
+            PROJECT_ROOT / "outputs" / "story_sessions"
+        )
+        self._story_generator = story_generator or CodexStoryGenerator()
+        self._story_worker: StoryWorker | None = None
         self._text_manager_context = Text_Manager()
         self._text_manager = self._text_manager_context.__enter__()
         supported_classes = self._text_manager.get_supported_yolo_classes()
@@ -85,6 +96,7 @@ class RuntimeWindow(QMainWindow):
         self._video_stream.active_classes_changed.connect(
             self.show_active_classes,
         )
+        self._video_stream.detection_frame_ready.connect(self.record_story_frame)
         if self._whisper_stream is not None:
             self._whisper_stream.status_changed.connect(self.show_whisper_status)
             self._whisper_stream.transcript_ready.connect(self.receive_transcript)
@@ -343,7 +355,27 @@ class RuntimeWindow(QMainWindow):
         send_button.setObjectName("send-command")
         send_button.clicked.connect(self._submit_command)
         command_row.addWidget(send_button)
+
+        story_button = QPushButton("Story")
+        story_button.setObjectName("generate-story")
+        story_button.clicked.connect(self._generate_story)
+        command_row.addWidget(story_button)
         layout.addLayout(command_row)
+
+        story_row = QHBoxLayout()
+        story_image = QLabel("No story image")
+        story_image.setObjectName("story-image")
+        story_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        story_image.setFixedSize(180, 102)
+        story_row.addWidget(story_image)
+
+        story_output = QLabel(
+            "Matched snapshots will become a short story for this session."
+        )
+        story_output.setObjectName("story-output")
+        story_output.setWordWrap(True)
+        story_row.addWidget(story_output, stretch=1)
+        layout.addLayout(story_row)
 
         return panel
 
@@ -375,6 +407,7 @@ class RuntimeWindow(QMainWindow):
             self._show_queue_message("No supported keywords found")
             return
 
+        self._session_recorder.record_instruction(text, classes)
         self._video_stream.set_classes(classes)
 
     def _show_queue_message(self, message: str) -> None:
@@ -450,6 +483,70 @@ class RuntimeWindow(QMainWindow):
         self._current_frame = image
         self.findChild(QLabel, "camera-runtime-status").setText("Streaming")
         self._refresh_video_panel()
+
+    @Slot(QImage, object)
+    def record_story_frame(self, image: QImage, detections: object) -> None:
+        """Save a detection frame when it matches the latest instruction."""
+        try:
+            self._session_recorder.record_detection(image, detections)
+        except (OSError, TypeError, ValueError) as error:
+            self.findChild(QLabel, "story-output").setText(
+                f"Could not save snapshot: {error}"
+            )
+
+    def _generate_story(self) -> None:
+        story_output = self.findChild(QLabel, "story-output")
+        story_button = self.findChild(QPushButton, "generate-story")
+        if not self._session_recorder.has_snapshots:
+            story_output.setText(
+                "No matching snapshots yet. Speak an object name and find it first."
+            )
+            return
+        if self._story_worker is not None and self._story_worker.isRunning():
+            return
+
+        story_button.setEnabled(False)
+        story_output.setText("Writing a story with Codex…")
+        worker = StoryWorker(
+            self._story_generator,
+            self._session_recorder.session_dir,
+            parent=self,
+        )
+        self._story_worker = worker
+        worker.completed.connect(self._show_story)
+        worker.failed.connect(self._show_story_error)
+        worker.finished.connect(self._story_worker_finished)
+        worker.start()
+
+    @Slot(object)
+    def _show_story(self, result: StoryResult) -> None:
+        self.findChild(QLabel, "story-output").setText(
+            f"{result.title}\n{result.story}"
+        )
+        story_image = self.findChild(QLabel, "story-image")
+        pixmap = QPixmap(str(result.representative_image))
+        story_image.setText("")
+        story_image.setPixmap(
+            pixmap.scaled(
+                story_image.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        )
+        self.findChild(QPushButton, "generate-story").setEnabled(True)
+
+    @Slot(str)
+    def _show_story_error(self, message: str) -> None:
+        self.findChild(QLabel, "story-output").setText(
+            f"Story generation failed: {message}"
+        )
+        self.findChild(QPushButton, "generate-story").setEnabled(True)
+
+    @Slot()
+    def _story_worker_finished(self) -> None:
+        if self._story_worker is not None:
+            self._story_worker.deleteLater()
+        self._story_worker = None
 
     @Slot(str)
     def show_video_error(self, message: str) -> None:
@@ -535,6 +632,8 @@ class RuntimeWindow(QMainWindow):
         if self._whisper_stream is not None:
             self._whisper_stream.stop()
             self._whisper_stream.wait()
+        if self._story_worker is not None and self._story_worker.isRunning():
+            self._story_worker.wait()
         self._text_manager_context.__exit__(None, None, None)
         super().closeEvent(event)
 
@@ -640,6 +739,16 @@ class RuntimeWindow(QMainWindow):
             font-weight: 700;
             letter-spacing: 0.3px;
         }
+        QLabel#story-image {
+            background: #090b0e;
+            border: 1px solid #343a44;
+            border-radius: 6px;
+            color: #68717d;
+        }
+        QLabel#story-output {
+            color: #c9cfda;
+            font-style: italic;
+        }
         QLineEdit {
             background: #090b0e;
             border: 1px solid #343a44;
@@ -667,6 +776,11 @@ class RuntimeWindow(QMainWindow):
             background: #c77e25;
             border-color: #f2a33a;
             color: #111419;
+        }
+        QPushButton#generate-story {
+            background: #6046a8;
+            border-color: #8265d6;
+            color: #ffffff;
         }
         QPushButton#toggle-whisper {
             background: #167f8c;
