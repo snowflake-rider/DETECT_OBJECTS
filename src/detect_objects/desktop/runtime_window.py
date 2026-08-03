@@ -41,6 +41,7 @@ class RuntimeWindow(QMainWindow):
         super().__init__()
         self._context = context
         self._current_frame: QImage | None = None
+        self._last_queued_classes: tuple[str, ...] = ()
         self._text_manager_context = Text_Manager()
         self._text_manager = self._text_manager_context.__enter__()
         supported_classes = self._text_manager.get_supported_yolo_classes()
@@ -78,6 +79,12 @@ class RuntimeWindow(QMainWindow):
         self._video_stream.error.connect(self.show_video_error)
         self._video_stream.model_status.connect(self.show_model_status)
         self._video_stream.detections_ready.connect(self.show_detections)
+        self._video_stream.keyword_queue_changed.connect(
+            self.show_keyword_queue,
+        )
+        self._video_stream.active_classes_changed.connect(
+            self.show_active_classes,
+        )
         if self._whisper_stream is not None:
             self._whisper_stream.status_changed.connect(self.show_whisper_status)
             self._whisper_stream.transcript_ready.connect(self.receive_transcript)
@@ -125,6 +132,15 @@ class RuntimeWindow(QMainWindow):
         preview_button.setObjectName("toggle-preview")
         preview_button.clicked.connect(self._toggle_preview)
         primary_row.addWidget(preview_button)
+
+        listen_button = QPushButton("Start listening")
+        listen_button.setObjectName("toggle-whisper")
+        listen_button.setToolTip(
+            "Start or stop Whisper voice instructions. Text input remains available."
+        )
+        listen_button.clicked.connect(self._toggle_whisper)
+        listen_button.setEnabled(self._whisper_stream is not None)
+        primary_row.addWidget(listen_button)
 
         quit_button = QPushButton("Quit")
         quit_button.setObjectName("quit-runtime")
@@ -224,18 +240,9 @@ class RuntimeWindow(QMainWindow):
         layout.setContentsMargins(12, 8, 10, 8)
         layout.setSpacing(3)
 
-        heading_row = QHBoxLayout()
         heading = QLabel("WHISPER VOICE")
         heading.setObjectName("status-heading")
-        heading_row.addWidget(heading)
-        heading_row.addStretch()
-
-        toggle = QPushButton("Start listening")
-        toggle.setObjectName("toggle-whisper")
-        toggle.clicked.connect(self._toggle_whisper)
-        toggle.setEnabled(self._whisper_stream is not None)
-        heading_row.addWidget(toggle)
-        layout.addLayout(heading_row)
+        layout.addWidget(heading)
 
         model = QLabel(model_name)
         model.setObjectName("whisper-model")
@@ -288,6 +295,21 @@ class RuntimeWindow(QMainWindow):
         target_row.addWidget(targets, stretch=1)
         layout.addLayout(target_row)
 
+        queue_row = QHBoxLayout()
+        queue_heading = QLabel("QUEUE")
+        queue_heading.setObjectName("rail-label")
+        queue_row.addWidget(queue_heading)
+
+        queue_count = QLabel("0 keywords")
+        queue_count.setObjectName("keyword-queue-count")
+        queue_row.addWidget(queue_count)
+
+        queue_summary = QLabel("Empty — waiting for an instruction")
+        queue_summary.setObjectName("keyword-queue-summary")
+        queue_summary.setWordWrap(True)
+        queue_row.addWidget(queue_summary, stretch=1)
+        layout.addLayout(queue_row)
+
         transcript_row = QHBoxLayout()
         transcript_heading = QLabel("INSTRUCTION")
         transcript_heading.setObjectName("rail-label")
@@ -298,16 +320,26 @@ class RuntimeWindow(QMainWindow):
         transcript_row.addWidget(transcript, stretch=1)
         layout.addLayout(transcript_row)
 
+        text_input_hint = QLabel(
+            "TEXT INPUT  Always available — uses the same keyword path as Whisper"
+        )
+        text_input_hint.setObjectName("text-input-hint")
+        layout.addWidget(text_input_hint)
+
         command_row = QHBoxLayout()
         command_input = QLineEdit()
         command_input.setObjectName("command-input")
         command_input.setPlaceholderText(
-            "Type an object instruction, for example: 사람을 찾아줘"
+            "Type keywords or an instruction: person, bicycle / 사람, 자전거"
+        )
+        command_input.setToolTip(
+            "Text works while the microphone is off and follows the same "
+            "keyword parsing path as Whisper."
         )
         command_input.returnPressed.connect(self._submit_command)
         command_row.addWidget(command_input, stretch=1)
 
-        send_button = QPushButton("Send")
+        send_button = QPushButton("Queue")
         send_button.setObjectName("send-command")
         send_button.clicked.connect(self._submit_command)
         command_row.addWidget(send_button)
@@ -331,8 +363,8 @@ class RuntimeWindow(QMainWindow):
         try:
             detected_classes = self._text_manager.extract(text)
         except (RuntimeError, ValueError) as error:
-            self.findChild(QLabel, "target-summary").setText(
-                f"Could not parse instruction: {error}"
+            self._show_queue_message(
+                f"Could not parse instruction: {error}",
             )
             return
 
@@ -340,13 +372,44 @@ class RuntimeWindow(QMainWindow):
             dict.fromkeys(detected.yolo_class for detected in detected_classes)
         )
         if not classes:
-            self.findChild(QLabel, "target-summary").setText(
-                "No supported object found; current targets unchanged"
-            )
+            self._show_queue_message("No supported keywords found")
             return
 
         self._video_stream.set_classes(classes)
-        self.findChild(QLabel, "target-summary").setText(" · ".join(classes))
+
+    def _show_queue_message(self, message: str) -> None:
+        """Show instruction feedback without replacing active targets."""
+        self.findChild(QLabel, "keyword-queue-count").setText("0 keywords")
+        self.findChild(QLabel, "keyword-queue-summary").setText(message)
+
+    @Slot(object)
+    def show_keyword_queue(self, _classes: object) -> None:
+        """Show the keyword batch currently waiting for the camera worker."""
+        event_classes = tuple(_classes) if _classes else ()
+        if event_classes:
+            self._last_queued_classes = event_classes
+
+        pending_classes = self._video_stream.pending_classes
+        queued_classes = tuple(pending_classes) if pending_classes else ()
+        count = len(queued_classes)
+        noun = "keyword" if count == 1 else "keywords"
+        self.findChild(QLabel, "keyword-queue-count").setText(f"{count} {noun}")
+        if queued_classes:
+            summary = " · ".join(queued_classes)
+        elif self._last_queued_classes:
+            summary = "Empty — sent to targets: " + " · ".join(
+                self._last_queued_classes
+            )
+        else:
+            summary = "Empty — waiting for an instruction"
+        self.findChild(QLabel, "keyword-queue-summary").setText(summary)
+
+    @Slot(object)
+    def show_active_classes(self, classes: object) -> None:
+        """Show the keyword classes currently active in YOLO."""
+        active_classes = tuple(classes) if classes else ()
+        if active_classes:
+            self.findChild(QLabel, "target-summary").setText(" · ".join(active_classes))
 
     @Slot(str)
     def receive_transcript(self, transcript: str) -> None:
@@ -546,6 +609,16 @@ class RuntimeWindow(QMainWindow):
             font-weight: 700;
             min-width: 72px;
         }
+        QLabel#keyword-queue-count {
+            background: #242a32;
+            border: 1px solid #3a424e;
+            border-radius: 9px;
+            color: #aeb7c5;
+            font-size: 10px;
+            font-weight: 700;
+            min-width: 72px;
+            padding: 2px 7px;
+        }
         QLabel#detection-summary {
             color: #f2a33a;
             font-weight: 700;
@@ -554,8 +627,18 @@ class RuntimeWindow(QMainWindow):
             color: #67c7d4;
             font-weight: 700;
         }
+        QLabel#keyword-queue-summary {
+            color: #d9a85f;
+            font-weight: 700;
+        }
         QLabel#transcript {
             color: #c9cfda;
+        }
+        QLabel#text-input-hint {
+            color: #747e8d;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
         }
         QLineEdit {
             background: #090b0e;
@@ -586,11 +669,14 @@ class RuntimeWindow(QMainWindow):
             color: #111419;
         }
         QPushButton#toggle-whisper {
-            background: #17343a;
-            border-color: #2c6973;
-            color: #8ee0ea;
-            padding: 5px 9px;
-            font-size: 11px;
+            background: #167f8c;
+            border: 2px solid #5de4f2;
+            color: #ffffff;
+            font-weight: 800;
+        }
+        QPushButton#toggle-whisper:hover {
+            background: #1b9dac;
+            border-color: #8af2fc;
         }
         QPushButton#toggle-whisper:disabled {
             background: #20242a;

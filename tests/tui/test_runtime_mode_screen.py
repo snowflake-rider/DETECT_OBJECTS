@@ -38,9 +38,10 @@ class RuntimeModeScreenTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("OpenCV", content)
             self.assertIsNotNone(app.screen.query_one("#mode-desktop", RadioButton))
             self.assertIsNotNone(app.screen.query_one("#mode-classic", RadioButton))
+            self.assertIsNotNone(app.screen.query_one("#prev-runtime", Button))
             self.assertIsNotNone(app.screen.query_one("#launch-runtime", Button))
             selected = app.screen.query_one("#runtime-mode", RadioSet).pressed_button
-            self.assertEqual(selected.id, "mode-classic")
+            self.assertEqual(selected.id, "mode-desktop")
 
     async def test_returns_desktop_mode(self) -> None:
         app = RuntimeModeTestApp()
@@ -52,14 +53,33 @@ class RuntimeModeScreenTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(app.return_value, RuntimeMode.DESKTOP)
 
-    async def test_returns_classic_mode(self) -> None:
+    async def test_returns_default_desktop_mode(self) -> None:
         app = RuntimeModeTestApp()
 
         async with app.run_test(size=(110, 32)) as pilot:
             await pilot.click("#launch-runtime")
             await pilot.pause()
 
+        self.assertIs(app.return_value, RuntimeMode.DESKTOP)
+
+    async def test_returns_classic_mode_when_selected(self) -> None:
+        app = RuntimeModeTestApp()
+
+        async with app.run_test(size=(110, 32)) as pilot:
+            await pilot.click("#mode-classic")
+            await pilot.click("#launch-runtime")
+            await pilot.pause()
+
         self.assertIs(app.return_value, RuntimeMode.CLASSIC)
+
+    async def test_previous_returns_without_a_runtime_selection(self) -> None:
+        app = RuntimeModeTestApp()
+
+        async with app.run_test(size=(110, 32)) as pilot:
+            await pilot.click("#prev-runtime")
+            await pilot.pause()
+
+        self.assertIsNone(app.return_value)
 
 
 if __name__ == "__main__":

@@ -56,9 +56,13 @@ class MemoryDetector:
         self.loaded = False
         self.closed = False
         self.processed_frames = 0
+        self.active_classes: tuple[str, ...] | None = None
 
     def load(self) -> None:
         self.loaded = True
+
+    def set_classes(self, classes: tuple[str, ...]) -> None:
+        self.active_classes = classes
 
     def process(self, frame: np.ndarray):
         self.processed_frames += 1
@@ -139,6 +143,36 @@ class CameraVideoStreamTests(unittest.TestCase):
         self.assertTrue(detector.closed)
         self.assertIn("Ready · Test accelerator", model_statuses)
         self.assertIn((1, "PERSON 88%"), detection_summaries)
+
+    def test_keyword_queue_reports_pending_and_activated_classes(self) -> None:
+        capture = MemoryCapture(np.zeros((4, 4, 3), dtype=np.uint8))
+        detector = MemoryDetector()
+        queue_updates: list[tuple[str, ...]] = []
+        active_updates: list[tuple[str, ...]] = []
+        stream = CameraVideoStream(
+            index=3,
+            backend=1200,
+            name="Studio Camera",
+            capture_factory=RecordingCaptureFactory(capture),
+            detector=detector,
+        )
+        stream.keyword_queue_changed.connect(queue_updates.append)
+        stream.active_classes_changed.connect(active_updates.append)
+
+        stream.set_classes(("person", "backpack"))
+
+        self.assertEqual(stream.pending_classes, ("person", "backpack"))
+        self.assertEqual(queue_updates, [("person", "backpack")])
+
+        stream.start()
+        self.wait_until(lambda: detector.active_classes is not None)
+        stream.stop()
+        self.application.processEvents()
+
+        self.assertIsNone(stream.pending_classes)
+        self.assertEqual(detector.active_classes, ("person", "backpack"))
+        self.assertIn((), queue_updates)
+        self.assertIn(("person", "backpack"), active_updates)
 
 
 if __name__ == "__main__":

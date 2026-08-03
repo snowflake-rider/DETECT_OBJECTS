@@ -129,6 +129,7 @@ Classic은 현재 **안정 버전**으로 표시되는 실행 방식이다.
 
 Desktop은 현재 **Preview**로 표시되는 GUI 실행 방식이다. Classic에서 분리되어
 있던 영상, 장치 상태, 음성 인식, 명령 입력을 하나의 창으로 통합한다.
+장치 설정을 마친 뒤 별도로 모드를 바꾸지 않으면 이 대시보드가 기본으로 열린다.
 
 주요 화면 요소는 다음과 같다.
 
@@ -157,7 +158,7 @@ Desktop은 현재 **Preview**로 표시되는 GUI 실행 방식이다. Classic�
 | Windows 환경 메뉴 | PowerShell | Windows 설치·재실행 | uv/Conda 선택 | 기본 경로 |
 | 장치 설정 마법사 | Textual | 매 실행 시작 | 장치 테스트, 모델·모드 선택 | 공통 진입점 |
 | Classic Runtime | 터미널 + OpenCV | 설정 완료 후 | 안정적인 실시간 탐지 | Stable |
-| Desktop Runtime | PySide6 | 설정 완료 후 | 통합 영상·음성 대시보드 | Preview |
+| Desktop Runtime | PySide6 | 설정 완료 후 기본 선택 | 통합 영상·음성 대시보드 | Preview |
 | 개발·노드 명령 | argparse | 개별 모듈 실행 | 테스트·분산 노드 옵션 | 개발자용 |
 
 ## 9. 현재 경계와 다음 결정

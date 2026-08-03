@@ -29,4 +29,4 @@ class Context:
     audio_output: AudioOutput
     models: ModelSelection = field(default_factory=ModelSelection)
     ui_theme: str = DEFAULT_UI_THEME
-    runtime_mode: RuntimeMode = RuntimeMode.CLASSIC
+    runtime_mode: RuntimeMode = RuntimeMode.DESKTOP

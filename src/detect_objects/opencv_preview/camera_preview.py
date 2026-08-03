@@ -13,6 +13,8 @@ import cv2
 
 from ..device_setup import Camera
 
+RETURN_TO_TUI_HINT = "Press Q or Escape to return to TUI"
+
 
 class CameraPreviewMode(str, Enum):
     """Supported OpenCV camera preview behaviors."""
@@ -59,7 +61,7 @@ def show_camera_preview(
 ) -> CameraPreviewResult:
     """Own an OpenCV window until the user closes it."""
     capture = cv2.VideoCapture(index, backend)
-    window_name = f"{name} — {mode.value.title()} Preview"
+    window_name = f"{name} — {mode.value.title()} Preview — {RETURN_TO_TUI_HINT}"
 
     try:
         if not capture.isOpened():

@@ -250,13 +250,6 @@ class OdiaApp(App[Context | None]):
         margin-top: 2;
     }
 
-    .confirmation {
-        width: 100%;
-        margin-top: 1;
-        padding: 1 2;
-        background: $boost;
-    }
-
     .status {
         width: 100%;
         height: auto;
@@ -317,34 +310,78 @@ class OdiaApp(App[Context | None]):
 
     def _welcome_finished(self, started: bool) -> None:
         if started:
-            self.push_screen(AudioOutputScreen(), self._audio_output_finished)
+            self.push_screen(
+                AudioOutputScreen(self.session.audio_output),
+                self._audio_output_finished,
+            )
 
-    def _audio_output_finished(self, audio_output: AudioOutput) -> None:
+    def _audio_output_finished(self, audio_output: AudioOutput | None) -> None:
+        if audio_output is None:
+            self.push_screen(WelcomeScreen(), self._welcome_finished)
+            return
         self.session.audio_output = audio_output
         self.push_screen(
-            AudioInputScreen(audio_output),
+            AudioInputScreen(audio_output, self.session.audio_input),
             self._audio_input_finished,
         )
 
-    def _audio_input_finished(self, audio_input: AudioInput) -> None:
+    def _audio_input_finished(self, audio_input: AudioInput | None) -> None:
+        if audio_input is None:
+            self.push_screen(
+                AudioOutputScreen(self.session.audio_output),
+                self._audio_output_finished,
+            )
+            return
         self.session.audio_input = audio_input
-        self.push_screen(CameraScreen(), self._camera_finished)
+        self.push_screen(
+            CameraScreen(self.session.camera),
+            self._camera_finished,
+        )
 
-    def _camera_finished(self, camera: Camera) -> None:
+    def _camera_finished(self, camera: Camera | None) -> None:
+        if camera is None:
+            if self.session.audio_output is None:
+                raise RuntimeError("Audio output is required before camera setup.")
+            self.push_screen(
+                AudioInputScreen(
+                    self.session.audio_output,
+                    self.session.audio_input,
+                ),
+                self._audio_input_finished,
+            )
+            return
         self.session.camera = camera
-        self.push_screen(ModelSelectionScreen(), self._models_finished)
+        self.push_screen(
+            ModelSelectionScreen(self.session.models),
+            self._models_finished,
+        )
 
-    def _models_finished(self, models: ModelSelection) -> None:
+    def _models_finished(self, models: ModelSelection | None) -> None:
+        if models is None:
+            self.push_screen(
+                CameraScreen(self.session.camera),
+                self._camera_finished,
+            )
+            return
         self.session.models = models
         self.push_screen(SummaryScreen(self.session), self.finish_device_setup)
 
-    def finish_device_setup(self, context: Context) -> None:
+    def finish_device_setup(self, context: Context | None) -> None:
         """Ask how to launch after every device and model is confirmed."""
+        if context is None:
+            self.push_screen(
+                ModelSelectionScreen(self.session.models),
+                self._models_finished,
+            )
+            return
         self._completed_context = context
         self.push_screen(RuntimeModeScreen(), self._runtime_mode_finished)
 
-    def _runtime_mode_finished(self, runtime_mode: RuntimeMode) -> None:
+    def _runtime_mode_finished(self, runtime_mode: RuntimeMode | None) -> None:
         """Return setup selections with the chosen runtime interface."""
+        if runtime_mode is None:
+            self.push_screen(SummaryScreen(self.session), self.finish_device_setup)
+            return
         if self._completed_context is None:
             raise RuntimeError("Runtime mode was selected before setup completed.")
         self.exit(

@@ -48,22 +48,27 @@ class RuntimeWindowTests(unittest.TestCase):
         self.assertIsNotNone(video_panel.pixmap())
         self.assertEqual(
             self.window.findChild(QLabel, "yolo-status").text(),
-            "YOLO: Not started",
+            "Simulation ready",
         )
         self.assertEqual(
             self.window.findChild(QLabel, "whisper-status").text(),
-            "Whisper: Not started",
+            "Unavailable",
         )
         self.assertIsNotNone(self.window.findChild(QLabel, "transcript"))
         self.assertIsNotNone(self.window.findChild(QLineEdit, "command-input"))
         self.assertIsNotNone(self.window.findChild(QPushButton, "send-command"))
         self.assertIsNotNone(self.window.findChild(QPushButton, "toggle-preview"))
+        self.assertEqual(
+            self.window.findChild(QLabel, "keyword-queue-summary").text(),
+            "Empty — waiting for an instruction",
+        )
         quit_button = self.window.findChild(QPushButton, "quit-runtime")
         self.assertIsNotNone(quit_button)
         self.assertEqual(quit_button.text(), "Quit")
 
     def test_window_uses_camera_first_live_lens_layout(self) -> None:
-        self.assertIsNotNone(self.window.findChild(QFrame, "top-rail"))
+        top_rail = self.window.findChild(QFrame, "top-rail")
+        self.assertIsNotNone(top_rail)
         self.assertIsNotNone(self.window.findChild(QFrame, "command-dock"))
         self.assertEqual(
             self.window.findChild(QLabel, "live-status").text(),
@@ -72,6 +77,13 @@ class RuntimeWindowTests(unittest.TestCase):
         video_panel = self.window.findChild(QLabel, "video-panel")
         self.assertGreaterEqual(video_panel.minimumWidth(), 640)
         self.assertGreaterEqual(video_panel.minimumHeight(), 360)
+        listen_button = self.window.findChild(QPushButton, "toggle-whisper")
+        self.assertIs(listen_button.parent(), top_rail)
+        self.assertEqual(listen_button.text(), "Start listening")
+        pause_button = self.window.findChild(QPushButton, "toggle-preview")
+        quit_button = self.window.findChild(QPushButton, "quit-runtime")
+        self.assertLess(pause_button.x(), listen_button.x())
+        self.assertLess(listen_button.x(), quit_button.x())
 
     def test_window_shows_devices_and_models_selected_in_setup(self) -> None:
         context = Context(
@@ -91,23 +103,22 @@ class RuntimeWindowTests(unittest.TestCase):
 
         self.assertEqual(
             configured_window.findChild(QLabel, "camera-selection").text(),
-            "Camera: Studio Camera (index 3)",
+            "Studio Camera · index 3",
         )
         self.assertEqual(
-            configured_window.findChild(QLabel, "audio-input-selection").text(),
-            "Audio input: Studio Microphone",
+            configured_window.findChild(QLabel, "audio-device-summary").text(),
+            "MIC  Studio Microphone     •     OUTPUT  Studio Speakers",
         )
         self.assertEqual(
-            configured_window.findChild(QLabel, "audio-output-selection").text(),
-            "Audio output: Studio Speakers",
+            configured_window.findChild(QLabel, "yolo-model").text(),
+            "YOLO-World v2 Small",
         )
         self.assertEqual(
-            configured_window.findChild(QLabel, "yolo-status").text(),
-            "YOLO: YOLO-World v2 Small · Not started",
+            configured_window.findChild(QLabel, "whisper-model").text(),
+            "Whisper Tiny — Korean",
         )
-        self.assertEqual(
-            configured_window.findChild(QLabel, "whisper-status").text(),
-            "Whisper: Whisper Tiny — Korean · Not started",
+        self.assertTrue(
+            configured_window.findChild(QPushButton, "toggle-whisper").isEnabled()
         )
 
     def test_camera_error_is_shown_without_closing_the_window(self) -> None:
@@ -130,7 +141,7 @@ class RuntimeWindowTests(unittest.TestCase):
 
         self.assertEqual(
             self.window.findChild(QLabel, "yolo-status").text(),
-            "YOLO: Ready · Test accelerator",
+            "Ready · Test accelerator",
         )
         self.assertEqual(
             self.window.findChild(QLabel, "detection-count").text(),
@@ -181,7 +192,99 @@ class RuntimeWindowTests(unittest.TestCase):
         self.assertEqual(command_input.text(), "")
         self.assertEqual(
             self.window.findChild(QLabel, "transcript").text(),
-            "Typed command: 사람을 찾아줘",
+            "Typed: 사람을 찾아줘",
+        )
+
+    def test_text_input_updates_queue_and_targets_with_microphone_off(self) -> None:
+        context = Context(
+            environment=Environment("Darwin", "25", "arm64", "3.11"),
+            camera=Camera(SimpleNamespace(index=3, name="Studio Camera", backend=1200)),
+            audio_input=AudioInput(AudioInputInfo(4, "Studio Microphone", 1, 48000.0)),
+            audio_output=AudioOutput(AudioOutputInfo(5, "Studio Speakers", 2, 48000.0)),
+            models=ModelSelection(voice_id="whisper_tiny_ko"),
+        )
+        text_window = RuntimeWindow(
+            context=context,
+            video_stream=FakeVideoStream(),
+        )
+        text_window.show()
+        self.application.processEvents()
+        self.addCleanup(text_window.close)
+
+        self.assertEqual(
+            text_window.findChild(QLabel, "whisper-status").text(),
+            "Off",
+        )
+        text_window.video_stream.stop()
+        command_input = text_window.findChild(QLineEdit, "command-input")
+        command_input.setText("find person and bicycle")
+
+        QTest.mouseClick(
+            text_window.findChild(QPushButton, "send-command"),
+            Qt.MouseButton.LeftButton,
+        )
+        self.application.processEvents()
+
+        self.assertEqual(
+            text_window.findChild(QLabel, "keyword-queue-summary").text(),
+            "person · bicycle",
+        )
+
+        text_window.video_stream.start()
+        self.application.processEvents()
+
+        self.assertEqual(
+            text_window.findChild(QLabel, "target-summary").text(),
+            "person · bicycle",
+        )
+
+    def test_typed_and_whisper_text_use_the_same_keyword_queue(self) -> None:
+        self.window.video_stream.stop()
+        command_input = self.window.findChild(QLineEdit, "command-input")
+        command_input.setText("find person and bicycle")
+        QTest.mouseClick(
+            self.window.findChild(QPushButton, "send-command"),
+            Qt.MouseButton.LeftButton,
+        )
+        typed_classes = self.window.video_stream.pending_classes
+
+        self.window.video_stream.start()
+        self.application.processEvents()
+        self.window.video_stream.stop()
+        self.window.receive_transcript("find person and bicycle")
+        spoken_classes = self.window.video_stream.pending_classes
+
+        self.assertEqual(typed_classes, ("person", "bicycle"))
+        self.assertEqual(spoken_classes, typed_classes)
+
+    def test_window_shows_queued_keywords_then_active_targets(self) -> None:
+        self.window.video_stream.stop()
+
+        self.window.video_stream.set_classes(("person", "backpack"))
+
+        self.assertEqual(
+            self.window.findChild(QLabel, "keyword-queue-count").text(),
+            "2 keywords",
+        )
+        self.assertEqual(
+            self.window.findChild(QLabel, "keyword-queue-summary").text(),
+            "person · backpack",
+        )
+
+        self.window.video_stream.start()
+        self.application.processEvents()
+
+        self.assertEqual(
+            self.window.findChild(QLabel, "keyword-queue-count").text(),
+            "0 keywords",
+        )
+        self.assertEqual(
+            self.window.findChild(QLabel, "keyword-queue-summary").text(),
+            "Empty — sent to targets: person · backpack",
+        )
+        self.assertEqual(
+            self.window.findChild(QLabel, "target-summary").text(),
+            "person · backpack",
         )
 
     def test_quit_button_requests_shutdown_and_closes_window(self) -> None:

@@ -73,6 +73,8 @@ class FakeVideoStream(QObject):
     error = Signal(str)
     model_status = Signal(str)
     detections_ready = Signal(int, str)
+    keyword_queue_changed = Signal(object)
+    active_classes_changed = Signal(object)
 
     def __init__(self, *, fps: int = 12, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -80,6 +82,7 @@ class FakeVideoStream(QObject):
             raise ValueError("fps must be greater than zero")
 
         self._frame_number = 0
+        self._pending_classes: tuple[str, ...] | None = None
         self._timer = QTimer(self)
         self._timer.setInterval(max(1, round(1000 / fps)))
         self._timer.timeout.connect(self._emit_frame)
@@ -94,6 +97,11 @@ class FakeVideoStream(QObject):
         """Return whether the timer is currently producing frames."""
         return self._timer.isActive()
 
+    @property
+    def pending_classes(self) -> tuple[str, ...] | None:
+        """Return the keyword batch waiting for the next synthetic frame."""
+        return self._pending_classes
+
     def start(self) -> None:
         """Begin emitting frames, including one immediately."""
         if self.is_running:
@@ -107,8 +115,18 @@ class FakeVideoStream(QObject):
 
     def set_classes(self, classes: tuple[str, ...]) -> None:
         """Accept instruction updates when the UI uses its synthetic preview."""
+        if not classes:
+            return
+        self._pending_classes = classes
+        self.keyword_queue_changed.emit(classes)
 
     def _emit_frame(self) -> None:
+        if self._pending_classes is not None:
+            active_classes = self._pending_classes
+            self._pending_classes = None
+            self.keyword_queue_changed.emit(())
+            self.active_classes_changed.emit(active_classes)
+
         frame = create_fake_frame(self._frame_number)
         self._frame_number += 1
         self.frame_ready.emit(frame_to_qimage(frame))

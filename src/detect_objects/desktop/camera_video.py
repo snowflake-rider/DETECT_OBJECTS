@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from queue import Empty, Full, Queue
-from threading import Event
+from threading import Event, Lock
 from typing import Protocol
 
 import cv2
@@ -51,6 +51,8 @@ class CameraVideoStream(QThread):
     error = Signal(str)
     model_status = Signal(str)
     detections_ready = Signal(int, str)
+    keyword_queue_changed = Signal(object)
+    active_classes_changed = Signal(object)
 
     def __init__(
         self,
@@ -70,6 +72,14 @@ class CameraVideoStream(QThread):
         self._detector = detector
         self._stop_requested = Event()
         self._pending_classes: Queue[tuple[str, ...]] = Queue(maxsize=1)
+        self._pending_classes_lock = Lock()
+        self._pending_classes_snapshot: tuple[str, ...] | None = None
+
+    @property
+    def pending_classes(self) -> tuple[str, ...] | None:
+        """Return the keyword batch waiting for the camera worker."""
+        with self._pending_classes_lock:
+            return self._pending_classes_snapshot
 
     @property
     def is_running(self) -> bool:
@@ -93,14 +103,18 @@ class CameraVideoStream(QThread):
         """Schedule the latest requested detection classes for the worker."""
         if not classes:
             return
-        try:
-            self._pending_classes.put_nowait(classes)
-        except Full:
+
+        with self._pending_classes_lock:
             try:
-                self._pending_classes.get_nowait()
-            except Empty:
-                pass
-            self._pending_classes.put_nowait(classes)
+                self._pending_classes.put_nowait(classes)
+            except Full:
+                try:
+                    self._pending_classes.get_nowait()
+                except Empty:
+                    pass
+                self._pending_classes.put_nowait(classes)
+            self._pending_classes_snapshot = classes
+        self.keyword_queue_changed.emit(classes)
 
     def run(self) -> None:
         """Own the OpenCV capture until stopped or a camera error occurs."""
@@ -124,12 +138,18 @@ class CameraVideoStream(QThread):
                     return
 
                 if self._detector is not None:
-                    try:
-                        classes = self._pending_classes.get_nowait()
-                    except Empty:
-                        classes = None
+                    with self._pending_classes_lock:
+                        try:
+                            classes = self._pending_classes.get_nowait()
+                        except Empty:
+                            classes = None
+                        else:
+                            self._pending_classes_snapshot = None
+                    if classes is not None:
+                        self.keyword_queue_changed.emit(())
                     if classes is not None:
                         self._detector.set_classes(classes)
+                        self.active_classes_changed.emit(classes)
                     frame, detections = self._detector.process(frame)
                     summary = " · ".join(
                         format_detection_label(

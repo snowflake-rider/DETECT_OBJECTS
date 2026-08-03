@@ -13,7 +13,6 @@ from textual.message import Message
 from textual.screen import Screen
 from textual.widgets import (
     Button,
-    Checkbox,
     Digits,
     Footer,
     Header,
@@ -41,8 +40,6 @@ from ..device_setup import (
     probe_audio_output,
 )
 from ..models import (
-    DEFAULT_VISION_MODEL_ID,
-    DEFAULT_VOICE_MODEL_ID,
     ModelSelection,
     get_model_option,
     list_model_options,
@@ -169,19 +166,19 @@ class WelcomeScreen(Screen[bool]):
         self.dismiss(True)
 
 
-class AudioOutputScreen(Screen[AudioOutput]):
-    """Select an output, play a cat sample, and collect confirmation."""
+class AudioOutputScreen(Screen[AudioOutput | None]):
+    """Select an output and optionally play a cat sample."""
 
     class SampleFinished(Message):
         def __init__(self, result: AudioOutputProbeResult) -> None:
             self.result = result
             super().__init__()
 
-    def __init__(self) -> None:
+    def __init__(self, selected_output: AudioOutput | None = None) -> None:
         super().__init__()
+        self.selected_output = selected_output
         self.outputs: dict[int, AudioOutputInfo] = {}
         self._busy = False
-        self._sample_played = False
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -200,7 +197,8 @@ class AudioOutputScreen(Screen[AudioOutput]):
                 allow_blank=True,
                 id="audio-output",
             )
-            with Horizontal(classes="action-row"):
+            with Horizontal(classes="action-row three-actions"):
+                yield Button("←  Previous", id="prev-output")
                 yield Button(
                     "▶  Play Cat Meow",
                     id="play-output-sample",
@@ -212,12 +210,6 @@ class AudioOutputScreen(Screen[AudioOutput]):
                     variant="primary",
                     disabled=True,
                 )
-            yield Checkbox(
-                "Yes, I heard the cat from this output",
-                id="confirm-output",
-                disabled=True,
-                classes="confirmation",
-            )
             yield Static("Finding audio outputs…", id="output-status", classes="status")
         yield Footer()
 
@@ -234,6 +226,13 @@ class AudioOutputScreen(Screen[AudioOutput]):
         self.query_one("#audio-output", Select).set_options(
             (output.name, output.index) for output in outputs
         )
+        if (
+            self.selected_output is not None
+            and self.selected_output.info.index in self.outputs
+        ):
+            self.query_one("#audio-output", Select).value = (
+                self.selected_output.info.index
+            )
         if outputs:
             self.query_one("#output-status", Static).update(
                 "Select an output to enable the sample."
@@ -245,10 +244,6 @@ class AudioOutputScreen(Screen[AudioOutput]):
 
     @on(Select.Changed, "#audio-output")
     def output_changed(self) -> None:
-        self._sample_played = False
-        confirmation = self.query_one("#confirm-output", Checkbox)
-        confirmation.value = False
-        confirmation.disabled = True
         selection = self.query_one("#audio-output", Select).selection
         self.query_one("#play-output-sample", Button).disabled = (
             selection is None or self._busy
@@ -266,6 +261,7 @@ class AudioOutputScreen(Screen[AudioOutput]):
             return
         self._busy = True
         self.query_one("#audio-output", Select).disabled = True
+        self.query_one("#prev-output", Button).disabled = True
         self.query_one("#play-output-sample", Button).disabled = True
         self.query_one("#next-output", Button).disabled = True
         self.query_one("#output-status", Static).update("Playing cat meow…")
@@ -279,22 +275,22 @@ class AudioOutputScreen(Screen[AudioOutput]):
     def sample_finished(self, message: SampleFinished) -> None:
         self._busy = False
         self.query_one("#audio-output", Select).disabled = False
+        self.query_one("#prev-output", Button).disabled = False
         self.query_one("#play-output-sample", Button).disabled = False
         self.query_one("#next-output", Button).disabled = False
         if message.result.available:
-            self._sample_played = True
-            self.query_one("#confirm-output", Checkbox).disabled = False
             self.query_one("#output-status", Static).update(
-                "Sample finished. Did you hear the cat?"
+                "Sample playback completed."
             )
         else:
             self.query_one("#output-status", Static).update(
                 f"Output test failed: {message.result.error}"
             )
 
-    @on(Checkbox.Changed, "#confirm-output")
-    def output_confirmation_changed(self) -> None:
-        """Retain confirmation as feedback without gating navigation."""
+    @on(Button.Pressed, "#prev-output")
+    def previous_output(self) -> None:
+        if not self._busy:
+            self.dismiss(None)
 
     @on(Button.Pressed, "#next-output")
     def finish_output(self) -> None:
@@ -303,8 +299,8 @@ class AudioOutputScreen(Screen[AudioOutput]):
             self.dismiss(AudioOutput(self.outputs[output_index]))
 
 
-class AudioInputScreen(Screen[AudioInput]):
-    """Record an input, play it back, and collect confirmation."""
+class AudioInputScreen(Screen[AudioInput | None]):
+    """Select an input and optionally record and play it back."""
 
     class LevelChanged(Message):
         def __init__(self, decibels: float) -> None:
@@ -321,15 +317,19 @@ class AudioInputScreen(Screen[AudioInput]):
             self.result = result
             super().__init__()
 
-    def __init__(self, audio_output: AudioOutput) -> None:
+    def __init__(
+        self,
+        audio_output: AudioOutput,
+        selected_input: AudioInput | None = None,
+    ) -> None:
         super().__init__()
         self.audio_output = audio_output
+        self.selected_input = selected_input
         self.inputs: dict[int, AudioInputInfo] = {}
         self._monitoring = False
         self._busy = False
         self._stop_event: Event | None = None
         self._recording: AudioRecording | None = None
-        self._playback_succeeded = False
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -360,7 +360,8 @@ class AudioInputScreen(Screen[AudioInput]):
             )
             level.display = False
             yield level
-            with Horizontal(classes="action-row three-actions"):
+            with Horizontal(classes="action-row four-actions"):
+                yield Button("←  Previous", id="prev-input")
                 yield Button("Monitor", id="monitor-input", disabled=True)
                 yield Button("▶  Playback", id="play-recording", disabled=True)
                 yield Button(
@@ -369,12 +370,6 @@ class AudioInputScreen(Screen[AudioInput]):
                     variant="primary",
                     disabled=True,
                 )
-            yield Checkbox(
-                "Yes, my recorded voice sounds clear",
-                id="confirm-input",
-                disabled=True,
-                classes="confirmation",
-            )
             yield Static("Finding audio inputs…", id="input-status", classes="status")
         yield Footer()
 
@@ -391,6 +386,13 @@ class AudioInputScreen(Screen[AudioInput]):
         self.query_one("#audio-input", Select).set_options(
             (audio_input.name, audio_input.index) for audio_input in inputs
         )
+        if (
+            self.selected_input is not None
+            and self.selected_input.info.index in self.inputs
+        ):
+            self.query_one("#audio-input", Select).value = (
+                self.selected_input.info.index
+            )
         self.query_one("#input-status", Static).update(
             "Select an input to begin." if inputs else "No audio inputs were found."
         )
@@ -398,10 +400,6 @@ class AudioInputScreen(Screen[AudioInput]):
     @on(Select.Changed, "#audio-input")
     def input_changed(self) -> None:
         self._recording = None
-        self._playback_succeeded = False
-        confirmation = self.query_one("#confirm-input", Checkbox)
-        confirmation.value = False
-        confirmation.disabled = True
         selection = self.query_one("#audio-input", Select).selection
         self.query_one("#monitor-input", Button).disabled = selection is None
         self.query_one("#play-recording", Button).disabled = True
@@ -426,14 +424,11 @@ class AudioInputScreen(Screen[AudioInput]):
             return
 
         self._recording = None
-        self._playback_succeeded = False
         self._busy = True
         self._monitoring = True
         self._stop_event = Event()
-        confirmation = self.query_one("#confirm-input", Checkbox)
-        confirmation.value = False
-        confirmation.disabled = True
         self.query_one("#audio-input", Select).disabled = True
+        self.query_one("#prev-input", Button).disabled = True
         self.query_one("#monitor-input", Button).label = "Done"
         self.query_one("#play-recording", Button).disabled = True
         self.query_one("#next-input", Button).disabled = True
@@ -472,6 +467,7 @@ class AudioInputScreen(Screen[AudioInput]):
         self._monitoring = False
         self._stop_event = None
         self.query_one("#audio-input", Select).disabled = False
+        self.query_one("#prev-input", Button).disabled = False
         self.query_one("#monitor-input", Button).label = "Record Again"
         self.query_one("#monitor-input", Button).disabled = False
         self.query_one("#input-level", ProgressBar).display = False
@@ -496,6 +492,7 @@ class AudioInputScreen(Screen[AudioInput]):
             return
         self._busy = True
         self.query_one("#audio-input", Select).disabled = True
+        self.query_one("#prev-input", Button).disabled = True
         self.query_one("#monitor-input", Button).disabled = True
         self.query_one("#play-recording", Button).disabled = True
         self.query_one("#next-input", Button).disabled = True
@@ -511,23 +508,23 @@ class AudioInputScreen(Screen[AudioInput]):
     def playback_finished(self, message: PlaybackFinished) -> None:
         self._busy = False
         self.query_one("#audio-input", Select).disabled = False
+        self.query_one("#prev-input", Button).disabled = False
         self.query_one("#monitor-input", Button).disabled = False
         self.query_one("#play-recording", Button).disabled = False
         self.query_one("#next-input", Button).disabled = False
         if message.result.successful:
-            self._playback_succeeded = True
-            self.query_one("#confirm-input", Checkbox).disabled = False
             self.query_one("#input-status", Static).update(
-                "Playback finished. Does your voice sound clear?"
+                "Recording playback completed."
             )
         else:
             self.query_one("#input-status", Static).update(
                 f"Playback failed: {message.result.error}"
             )
 
-    @on(Checkbox.Changed, "#confirm-input")
-    def input_confirmation_changed(self) -> None:
-        """Retain confirmation as feedback without gating navigation."""
+    @on(Button.Pressed, "#prev-input")
+    def previous_input(self) -> None:
+        if not self._busy and not self._monitoring:
+            self.dismiss(None)
 
     @on(Button.Pressed, "#next-input")
     def finish_input(self) -> None:
@@ -540,7 +537,7 @@ class AudioInputScreen(Screen[AudioInput]):
             self._stop_event.set()
 
 
-class CameraScreen(Screen[Camera]):
+class CameraScreen(Screen[Camera | None]):
     """Run separate still-camera and live-stream tests."""
 
     class CameraTestFinished(Message):
@@ -553,12 +550,12 @@ class CameraScreen(Screen[Camera]):
             self.result = result
             super().__init__()
 
-    def __init__(self) -> None:
+    def __init__(self, selected_camera: Camera | None = None) -> None:
         super().__init__()
+        self.selected_camera = selected_camera
         self.cameras: dict[int, CameraInfo] = {}
         self._busy = False
         self._camera_test_succeeded = False
-        self._streaming_test_succeeded = False
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -582,7 +579,8 @@ class CameraScreen(Screen[Camera]):
                 "finished reviewing it.[/]",
                 classes="camera-instructions",
             )
-            with Horizontal(classes="action-row three-actions"):
+            with Horizontal(classes="action-row four-actions"):
+                yield Button("←  Previous", id="prev-camera")
                 yield Button("Start Camera Test", id="test-camera", disabled=True)
                 yield Button(
                     "Start Streaming Test",
@@ -595,12 +593,6 @@ class CameraScreen(Screen[Camera]):
                     variant="primary",
                     disabled=True,
                 )
-            yield Checkbox(
-                "Yes, the camera image and live stream look correct",
-                id="confirm-camera",
-                disabled=True,
-                classes="confirmation",
-            )
             yield Static("Finding cameras…", id="camera-status", classes="status")
         yield Footer()
 
@@ -617,6 +609,13 @@ class CameraScreen(Screen[Camera]):
         self.query_one("#camera-input", Select).set_options(
             (camera.name, camera.index) for camera in cameras
         )
+        if (
+            self.selected_camera is not None
+            and self.selected_camera.info.index in self.cameras
+        ):
+            self.query_one("#camera-input", Select).value = (
+                self.selected_camera.info.index
+            )
         self.query_one("#camera-status", Static).update(
             "Select a camera to begin." if cameras else "No cameras were found."
         )
@@ -624,10 +623,6 @@ class CameraScreen(Screen[Camera]):
     @on(Select.Changed, "#camera-input")
     def camera_changed(self) -> None:
         self._camera_test_succeeded = False
-        self._streaming_test_succeeded = False
-        confirmation = self.query_one("#confirm-camera", Checkbox)
-        confirmation.value = False
-        confirmation.disabled = True
         selection = self.query_one("#camera-input", Select).selection
         self.query_one("#test-camera", Button).disabled = (
             selection is None or self._busy
@@ -645,10 +640,6 @@ class CameraScreen(Screen[Camera]):
         if camera_index is None:
             return
         self._camera_test_succeeded = False
-        self._streaming_test_succeeded = False
-        confirmation = self.query_one("#confirm-camera", Checkbox)
-        confirmation.value = False
-        confirmation.disabled = True
         self.query_one("#next-camera", Button).disabled = True
         self.query_one("#camera-status", Static).update(
             "Opening a still camera preview…"
@@ -659,10 +650,6 @@ class CameraScreen(Screen[Camera]):
     def start_streaming_test(self) -> None:
         if not self._camera_test_succeeded:
             return
-        self._streaming_test_succeeded = False
-        confirmation = self.query_one("#confirm-camera", Checkbox)
-        confirmation.value = False
-        confirmation.disabled = True
         self.query_one("#next-camera", Button).disabled = True
         self.query_one("#camera-status", Static).update(
             "Opening the live camera stream…"
@@ -675,6 +662,7 @@ class CameraScreen(Screen[Camera]):
             return
         self._busy = True
         self.query_one("#camera-input", Select).disabled = True
+        self.query_one("#prev-camera", Button).disabled = True
         self.query_one("#test-camera", Button).disabled = True
         self.query_one("#test-camera-stream", Button).disabled = True
         self.run_camera_test(Camera(self.cameras[camera_index]), mode)
@@ -688,6 +676,7 @@ class CameraScreen(Screen[Camera]):
     def camera_test_finished(self, message: CameraTestFinished) -> None:
         self._busy = False
         self.query_one("#camera-input", Select).disabled = False
+        self.query_one("#prev-camera", Button).disabled = False
         self.query_one("#test-camera", Button).disabled = False
         self.query_one("#test-camera-stream", Button).disabled = not (
             self._camera_test_succeeded
@@ -701,10 +690,8 @@ class CameraScreen(Screen[Camera]):
                     "Camera test passed. Next, start the streaming test."
                 )
             else:
-                self._streaming_test_succeeded = True
-                self.query_one("#confirm-camera", Checkbox).disabled = False
                 self.query_one("#camera-status", Static).update(
-                    "Streaming test completed. Does the video look correct?"
+                    "Streaming test completed."
                 )
         else:
             label = (
@@ -714,9 +701,10 @@ class CameraScreen(Screen[Camera]):
                 f"{label} test failed: {message.result.error}"
             )
 
-    @on(Checkbox.Changed, "#confirm-camera")
-    def camera_confirmation_changed(self) -> None:
-        """Retain confirmation as feedback without gating navigation."""
+    @on(Button.Pressed, "#prev-camera")
+    def previous_camera(self) -> None:
+        if not self._busy:
+            self.dismiss(None)
 
     @on(Button.Pressed, "#next-camera")
     def finish_camera(self) -> None:
@@ -725,8 +713,12 @@ class CameraScreen(Screen[Camera]):
             self.dismiss(Camera(self.cameras[camera_index]))
 
 
-class ModelSelectionScreen(Screen[ModelSelection]):
+class ModelSelectionScreen(Screen[ModelSelection | None]):
     """Choose the vision and voice model presets for this run."""
+
+    def __init__(self, selected_models: ModelSelection | None = None) -> None:
+        super().__init__()
+        self.selected_models = selected_models or ModelSelection()
 
     def compose(self) -> ComposeResult:
         vision_options = list_model_options("vision")
@@ -747,11 +739,11 @@ class ModelSelectionScreen(Screen[ModelSelection]):
             yield Select[str](
                 [(option.display_name, option.id) for option in vision_options],
                 allow_blank=False,
-                value=DEFAULT_VISION_MODEL_ID,
+                value=self.selected_models.vision_id,
                 id="vision-model",
             )
             yield Static(
-                get_model_option(DEFAULT_VISION_MODEL_ID).description,
+                get_model_option(self.selected_models.vision_id).description,
                 id="vision-model-description",
                 classes="model-description",
             )
@@ -760,21 +752,22 @@ class ModelSelectionScreen(Screen[ModelSelection]):
             yield Select[str](
                 [(option.display_name, option.id) for option in voice_options],
                 allow_blank=False,
-                value=DEFAULT_VOICE_MODEL_ID,
+                value=self.selected_models.voice_id,
                 id="voice-model",
             )
             yield Static(
-                get_model_option(DEFAULT_VOICE_MODEL_ID).description,
+                get_model_option(self.selected_models.voice_id).description,
                 id="voice-model-description",
                 classes="model-description",
             )
 
-            yield Button(
-                "Review Setup  →",
-                id="next-models",
-                variant="primary",
-                classes="primary-action",
-            )
+            with Horizontal(classes="action-row navigation-row"):
+                yield Button("←  Previous", id="prev-models")
+                yield Button(
+                    "Review Setup  →",
+                    id="next-models",
+                    variant="primary",
+                )
         yield Footer()
 
     @on(Select.Changed, "#vision-model")
@@ -804,6 +797,10 @@ class ModelSelectionScreen(Screen[ModelSelection]):
             vision_id is None or voice_id is None
         )
 
+    @on(Button.Pressed, "#prev-models")
+    def previous_models(self) -> None:
+        self.dismiss(None)
+
     @on(Button.Pressed, "#next-models")
     def finish_models(self) -> None:
         vision_id = self.query_one("#vision-model", Select).selection
@@ -819,7 +816,7 @@ class ModelSelectionScreen(Screen[ModelSelection]):
         )
 
 
-class SummaryScreen(Screen[Context]):
+class SummaryScreen(Screen[Context | None]):
     """Present the confirmed selections as the final setup dashboard."""
 
     def __init__(self, session: SetupSession) -> None:
@@ -897,13 +894,18 @@ class SummaryScreen(Screen[Context]):
                         "Recommended" if voice_model.recommended else "Selected",
                         classes="summary-table-detail",
                     )
-            yield Button(
-                "Choose Runtime  →",
-                id="finish-setup",
-                variant="success",
-                classes="primary-action",
-            )
+            with Horizontal(classes="action-row navigation-row"):
+                yield Button("←  Previous", id="prev-summary")
+                yield Button(
+                    "Choose Runtime  →",
+                    id="finish-setup",
+                    variant="success",
+                )
         yield Footer()
+
+    @on(Button.Pressed, "#prev-summary")
+    def previous_summary(self) -> None:
+        self.dismiss(None)
 
     @on(Button.Pressed, "#finish-setup")
     def finish_setup(self) -> None:

@@ -73,7 +73,10 @@ class CameraPreviewTests(unittest.TestCase):
             )
 
         self.assertTrue(result.successful)
-        imshow.assert_called_once()
+        imshow.assert_called_once_with(
+            "Test Camera — Snapshot Preview — " "Press Q or Escape to return to TUI",
+            capture.frame,
+        )
         self.assertTrue(capture.released)
         destroy.assert_called_once()
 
@@ -99,7 +102,10 @@ class CameraPreviewTests(unittest.TestCase):
             )
 
         self.assertTrue(result.successful)
-        imshow.assert_called_once()
+        imshow.assert_called_once_with(
+            "Test Camera — Stream Preview — " "Press Q or Escape to return to TUI",
+            capture.frame,
+        )
         self.assertTrue(capture.released)
 
     def test_launcher_passes_camera_and_mode_to_child_process(self) -> None:
