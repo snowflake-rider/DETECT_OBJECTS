@@ -1,9 +1,12 @@
+from collections import deque
+import math
+import queue
+import threading
+import traceback
+
 import numpy as np
 import sounddevice as sd
 import whisper
-import queue
-import math
-import traceback
 
 try:
     # Imported from the project root, e.g. `python main.py`.
@@ -11,7 +14,6 @@ try:
 except ImportError:
     # Also allow direct execution: `python voice_text_convert/mic_whisper_manager.py`.
     from parse_and_match_module import Text_Manager
-import threading
 
 SAMPLE_RATE = 16000
 CHANNELS = 1
@@ -20,12 +22,16 @@ BLOCK_SIZE = 1024
 MODEL_NAME = "base"
 MAX_AUDIO_QUEUE_SIZE = 5
 MAX_RESULT_QUEUE_SIZE = 5
+VAD_THRESHOLD = 0.01
+VAD_SILENCE_SECONDS = 0.6
+VAD_MIN_SPEECH_SECONDS = 0.25
+VAD_PRE_ROLL_SECONDS = 0.3
 
 
 class Whisper_Audio_Manager:
-    #| 설정               | 의미               |
-    #| ---------------- | ---------------- |
-    #| `model_name`     | Whisper 모델 이름    |
+    # | 설정               | 의미               |
+    # | ---------------- | ---------------- |
+    # | `model_name`     | Whisper 모델 이름    |
     # | `device_id`      | 사용할 마이크 장치 번호    |
     # | `sample_rate`    | 초당 수집할 오디오 샘플 개수 |
     # | `channels`       | 입력 오디오 채널 수      |
@@ -45,6 +51,10 @@ class Whisper_Audio_Manager:
         block_size=BLOCK_SIZE,
         language="ko",
         dtype="float32",
+        vad_threshold=VAD_THRESHOLD,
+        vad_silence_seconds=VAD_SILENCE_SECONDS,
+        vad_min_speech_seconds=VAD_MIN_SPEECH_SECONDS,
+        vad_pre_roll_seconds=VAD_PRE_ROLL_SECONDS,
     ):
         self.__device_id = device_id
         self.__whisper_model: whisper.Whisper = None
@@ -56,6 +66,19 @@ class Whisper_Audio_Manager:
         self.__block_size = block_size
         self.__language = language
         self.__dtype = dtype
+        self.__vad_threshold = float(vad_threshold)
+        self.__vad_silence_seconds = float(vad_silence_seconds)
+        self.__vad_min_speech_seconds = float(vad_min_speech_seconds)
+        self.__vad_pre_roll_seconds = float(vad_pre_roll_seconds)
+
+        if self.__vad_threshold <= 0:
+            raise ValueError("vad_threshold는 0보다 커야 합니다")
+        if self.__vad_silence_seconds <= 0:
+            raise ValueError("vad_silence_seconds는 0보다 커야 합니다")
+        if self.__vad_min_speech_seconds < 0:
+            raise ValueError("vad_min_speech_seconds는 0 이상이어야 합니다")
+        if self.__vad_pre_roll_seconds < 0:
+            raise ValueError("vad_pre_roll_seconds는 0 이상이어야 합니다")
 
         self.__stream: sd.InputStream | None = None
         self.__is_running = False
@@ -231,13 +254,27 @@ class Whisper_Audio_Manager:
         except queue.Full:
             pass
 
-    # 지정된 시간 만큼 데이터를 모으는 메서드
-    def collect_audio(self):
-        target_samples = int(self.__sample_rate * self.__record_seconds)
+    # 음성 시작을 기다리고, 발화 후 침묵이 이어지면 즉시 반환한다.
+    # record_seconds는 고정 녹음 시간이 아니라 최대 발화 길이로 사용한다.
+    def collect_audio(self) -> np.ndarray | None:
+        max_samples = int(self.__sample_rate * self.__record_seconds)
+        silence_limit_samples = int(self.__sample_rate * self.__vad_silence_seconds)
+        min_speech_samples = int(self.__sample_rate * self.__vad_min_speech_seconds)
+        pre_roll_block_count = max(
+            1,
+            math.ceil(
+                self.__sample_rate * self.__vad_pre_roll_seconds / self.__block_size
+            ),
+        )
+
+        pre_roll: deque[np.ndarray] = deque(maxlen=pre_roll_block_count)
         collected_blocks: list[np.ndarray] = []
         collected_samples = 0
+        speech_samples = 0
+        silence_samples = 0
+        speech_started = False
 
-        while collected_samples < target_samples:
+        while True:
             if self.__stop_event.is_set():
                 return None
             try:
@@ -245,17 +282,60 @@ class Whisper_Audio_Manager:
             except queue.Empty:
                 continue
 
-            collected_blocks.append(block)
-            collected_samples += block.shape[0]
+            mono_block = (
+                block[:, 0]
+                if block.ndim == 2 and block.shape[1] == 1
+                else np.mean(block, axis=1)
+            )
+            rms = float(np.sqrt(np.mean(np.square(mono_block))))
+            is_speech = rms >= self.__vad_threshold
 
-        if not collected_blocks:
+            if not speech_started:
+                pre_roll.append(block)
+                if not is_speech:
+                    continue
+
+                speech_started = True
+                collected_blocks.extend(pre_roll)
+                collected_samples = sum(
+                    saved_block.shape[0] for saved_block in collected_blocks
+                )
+                speech_samples = block.shape[0]
+                print(f"음성 감지: RMS={rms:.5f}")
+                continue
+
+            collected_blocks.append(block)
+            block_samples = block.shape[0]
+            collected_samples += block_samples
+
+            if is_speech:
+                speech_samples += block_samples
+                silence_samples = 0
+            else:
+                silence_samples += block_samples
+
+            enough_speech = speech_samples >= min_speech_samples
+            end_of_speech = silence_samples >= silence_limit_samples
+
+            if enough_speech and end_of_speech:
+                print(
+                    "발화 종료 감지: "
+                    f"{collected_samples / self.__sample_rate:.2f}초 수집"
+                )
+                break
+
+            if collected_samples >= max_samples:
+                print(f"최대 발화 시간 도달: {self.__record_seconds:.2f}초")
+                break
+
+        if not collected_blocks or not speech_started:
             return None
 
         audio = np.concatenate(
             collected_blocks,
             axis=0,
         )
-        audio = audio[:target_samples]
+        audio = audio[:max_samples]
         if audio.shape[1] == 1:
             audio = audio[:, 0]
         return audio.astype(np.float32, copy=False)
