@@ -5,6 +5,10 @@ Project-wide documentation is grouped here by purpose.
 ## Roadmap
 
 
+## Project overview
+
+- [Interfaces](project_interface.md)
+
 ## Learning
 
 - [Learn the ODIA architecture](learning/odia-architecture/README.md)

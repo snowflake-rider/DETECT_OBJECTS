@@ -21,6 +21,9 @@ soundfile==0.13.1
 # Device-setup interface
 textual>=8.2.8
 
+# Integrated desktop runtime
+PySide6==6.11.1
+
 # macOS native audio APIs and Apple-Silicon source separation
 pyobjc-framework-AVFoundation; sys_platform == "darwin"
 pyobjc-framework-SoundAnalysis; sys_platform == "darwin"

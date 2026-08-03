@@ -12,6 +12,7 @@ REQUIRED_MODULES = (
     "cv2",
     "cv2_enumerate_cameras",
     "numpy",
+    "PySide6",
     "sounddevice",
     "soundfile",
     "textual",

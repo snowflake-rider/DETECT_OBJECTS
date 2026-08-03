@@ -17,6 +17,7 @@ dependencies = [
     "openai-whisper==20250625",
     "opencv-python==5.0.0.93",
     "pandas>=3.0.5",
+    "PySide6==6.11.1",
     "pyobjc-framework-avfoundation; sys_platform == 'darwin'",
     "pyobjc-framework-soundanalysis; sys_platform == 'darwin'",
     "sounddevice==0.5.5",

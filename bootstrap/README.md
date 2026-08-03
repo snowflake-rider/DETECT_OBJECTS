@@ -56,3 +56,8 @@ Rerun setup to update the environment:
 
 With uv, add or remove dependencies using `.odia/tools/bin/uv add PACKAGE` or
 `.odia/tools/bin/uv remove PACKAGE`.
+
+The bootstrap installs PySide6 for the integrated Desktop Dashboard. It is
+declared in both `pyproject.toml` and `requirements.txt`, locked for uv, and
+checked by `bootstrap/tools/verify_environment.py` so the uv and Conda paths
+prepare the same runnable interfaces.
