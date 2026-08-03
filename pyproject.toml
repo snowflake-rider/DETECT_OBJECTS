@@ -30,6 +30,9 @@ dependencies = [
 
 [project.scripts]
 odia = "detect_objects.main:main"
+odia-cluster = "detect_objects.distributed.client:main"
+odia-coordinator = "detect_objects.distributed.coordinator:main"
+odia-worker = "detect_objects.distributed.worker:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
