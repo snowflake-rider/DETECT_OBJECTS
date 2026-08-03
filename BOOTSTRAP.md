@@ -66,18 +66,19 @@ Open a terminal in the project folder and run:
 
 ## Windows
 
-Open PowerShell in the project folder:
+Open PowerShell in the project folder and run the Windows setup script. Do not
+run the `.ps1` script directly from Git Bash:
 
 ```powershell
 .\bootstrap\setup.ps1
 ```
 
-## Choose an environment
+## Environment
 
-- `uv`: recommended
-- `conda`: use Conda; setup installs it automatically when it is missing
+Setup uses `uv` on macOS, Linux, and Windows. Conda setup is temporarily
+disabled while its support is reviewed.
 
-### Why uv is recommended
+### Why uv is used
 
 For this project, uv provides the most repeatable setup:
 
@@ -87,22 +88,18 @@ For this project, uv provides the most repeatable setup:
 - **Validation:** `uv sync --locked` stops when the project files and lockfile
   disagree instead of silently creating a different environment.
 
-These checks improve reliability and portability between computers. Conda is
-still available for users who already use it, but its result can depend more on
-the installed Conda version and the packages currently available to it.
+These checks improve reliability and portability between computers.
 
-Use the arrow keys and Enter to choose.
-
-You can also skip the menu:
+On macOS or Linux, start ODIA with:
 
 ```bash
-./bootstrap/setup.sh uv
+./bootstrap/setup.sh
 ```
 
-On Windows:
+On Windows, run this command in PowerShell:
 
 ```powershell
-.\bootstrap\setup.ps1 uv
+.\bootstrap\setup.ps1
 ```
 
 Run the same command again whenever you want to start ODIA.
