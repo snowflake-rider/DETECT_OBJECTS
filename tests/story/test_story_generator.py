@@ -75,23 +75,23 @@ class CodexStoryGeneratorTests(unittest.TestCase):
             {
                 "title": "The Watchful Street",
                 "story": "A person and a bicycle crossed paths under a patient clock.",
-                "representative_image": "snapshots/person.png",
+                "representative_image": "crops/person.png",
             }
         )
 
         with tempfile.TemporaryDirectory() as temporary_directory:
             session_dir = Path(temporary_directory)
-            snapshots_dir = session_dir / "snapshots"
-            snapshots_dir.mkdir()
-            first_snapshot = snapshots_dir / "person.png"
-            second_snapshot = snapshots_dir / "bicycle.png"
-            first_snapshot.write_bytes(b"first image")
-            second_snapshot.write_bytes(b"second image")
+            crops_dir = session_dir / "crops"
+            crops_dir.mkdir()
+            first_crop = crops_dir / "person.png"
+            second_crop = crops_dir / "bicycle.png"
+            first_crop.write_bytes(b"first image")
+            second_crop.write_bytes(b"second image")
             events = {
                 "instructions": [{"text": "사람과 자전거를 찾아줘"}],
                 "detections": [
-                    {"snapshot": "snapshots/person.png"},
-                    {"snapshot": "snapshots/bicycle.png"},
+                    {"crop": "crops/person.png", "selected": True},
+                    {"crop": "crops/bicycle.png", "selected": False},
                 ],
             }
             (session_dir / "events.json").write_text(
@@ -106,14 +106,14 @@ class CodexStoryGeneratorTests(unittest.TestCase):
                 result.story,
                 "A person and a bicycle crossed paths under a patient clock.",
             )
-            self.assertEqual(result.representative_image, first_snapshot.resolve())
+            self.assertEqual(result.representative_image, first_crop.resolve())
             self.assertEqual(
                 json.loads((session_dir / "story.json").read_text(encoding="utf-8")),
                 runner.response,
             )
-            self.assertEqual(runner.arguments.count("--image"), 2)
-            self.assertIn(str(first_snapshot), runner.arguments)
-            self.assertIn(str(second_snapshot), runner.arguments)
+            self.assertEqual(runner.arguments.count("--image"), 1)
+            self.assertIn(str(first_crop.resolve()), runner.arguments)
+            self.assertNotIn(str(second_crop.resolve()), runner.arguments)
             self.assertIn("--output-schema", runner.arguments)
             self.assertEqual(
                 runner.arguments[runner.arguments.index("--cd") + 1],
@@ -123,6 +123,64 @@ class CodexStoryGeneratorTests(unittest.TestCase):
             self.assertNotIn("--ask-for-approval", runner.arguments)
             self.assertIn("사람과 자전거를 찾아줘", runner.prompt)
             self.assertIn("short creative story", runner.prompt)
+            self.assertIn("Write the title and story in natural Korean", runner.prompt)
+            self.assertIn(
+                "제가 이 사진들을 보고 짧은 이야기를 만들어 봤어요.",
+                runner.prompt,
+            )
+            self.assertIn("2 to 3 short, creative sentences", runner.prompt)
+            self.assertNotIn("crops/bicycle.png", runner.prompt)
+
+    def test_finds_codex_and_its_runtime_when_app_path_is_restricted(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            local_bin = root / ".local" / "bin"
+            local_bin.mkdir(parents=True)
+            codex = local_bin / "codex"
+            codex.write_text("#!/usr/bin/env codex-test-runtime\n", encoding="utf-8")
+            codex.chmod(0o755)
+            runtime = local_bin / "codex-test-runtime"
+            runtime.write_text(
+                "#!/bin/sh\n"
+                'printf \'%s\\n\' \'{"title":"Found","story":"It worked.",'
+                '"representative_image":"crops/object.png"}\'\n',
+                encoding="utf-8",
+            )
+            runtime.chmod(0o755)
+
+            session_dir = root / "session"
+            crops_dir = session_dir / "crops"
+            crops_dir.mkdir(parents=True)
+            crop = crops_dir / "object.png"
+            crop.write_bytes(b"image")
+            (session_dir / "events.json").write_text(
+                json.dumps(
+                    {
+                        "instructions": [],
+                        "detections": [
+                            {
+                                "crop": "crops/object.png",
+                                "selected": True,
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                "os.environ",
+                {
+                    "HOME": str(root),
+                    "PATH": "/usr/bin:/bin",
+                    "ODIA_CODEX_SSH_TARGET": "",
+                },
+                clear=False,
+            ):
+                result = create_story_generator().generate(session_dir)
+
+            self.assertEqual(result.title, "Found")
+            self.assertEqual(result.representative_image, crop.resolve())
 
     def test_session_can_generate_a_story_through_a_remote_codex_host(self) -> None:
         runner = RecordingSshRunner(
@@ -163,6 +221,7 @@ class CodexStoryGeneratorTests(unittest.TestCase):
             self.assertEqual(runner.arguments[0], "ssh")
             self.assertIn("codex-mac", runner.arguments)
             self.assertIn("/opt/homebrew/bin/codex", runner.arguments[-1])
+            self.assertIn("PATH=/opt/homebrew/bin:$PATH", runner.arguments[-1])
             self.assertIn("read-only", runner.arguments[-1])
             self.assertEqual(
                 runner.archive_names,
@@ -174,6 +233,10 @@ class CodexStoryGeneratorTests(unittest.TestCase):
                 },
             )
             self.assertIn("사람을 찾아줘", runner.prompt)
+            self.assertIn(
+                "제가 이 사진들을 보고 짧은 이야기를 만들어 봤어요.",
+                runner.prompt,
+            )
             self.assertEqual(
                 json.loads((session_dir / "story.json").read_text(encoding="utf-8")),
                 runner.response,

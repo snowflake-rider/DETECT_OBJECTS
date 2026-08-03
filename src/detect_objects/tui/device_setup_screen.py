@@ -8,7 +8,7 @@ from threading import Event
 import sounddevice as sd
 from textual import on, work
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Center, Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.screen import Screen
 from textual.widgets import (
@@ -52,18 +52,61 @@ from ..opencv_preview.camera_preview import (
 from ..ui_theme import DEFAULT_UI_THEME, UI_THEME_OPTIONS
 
 
-def _step_rail(active: int) -> Static:
-    """Build a compact visual indicator for the sequential setup steps."""
-    labels = ("OUTPUT", "INPUT", "VIDEO", "MODELS", "READY")
-    parts: list[str] = []
+@dataclass(frozen=True)
+class SetupNavigation:
+    """Request a direct move to an available setup tab."""
+
+    step: int
+    value: object | None = None
+
+
+def _step_tabs(active: int, available: int) -> Center:
+    """Build keyboard-focusable tabs for the available setup steps."""
+    labels = ("SPEAKER", "MIC", "VIDEO", "MODELS", "READY")
+    tabs: list[Button] = []
     for position, label in enumerate(labels, start=1):
-        if position < active:
-            parts.append(f"[$success]✓ {label}[/]")
-        elif position == active:
-            parts.append(f"[bold $accent]● {label}[/]")
+        if position == active:
+            prefix = "●"
+            state_class = "step-tab-current"
+        elif position < available:
+            prefix = "✓"
+            state_class = "step-tab-complete"
         else:
-            parts.append(f"[dim]○ {label}[/]")
-    return Static("   ───   ".join(parts), classes="step-rail")
+            prefix = "○"
+            state_class = "step-tab-locked"
+        tabs.append(
+            Button(
+                f"{prefix}  {label}",
+                id=f"setup-tab-{position}",
+                classes=f"step-tab {state_class}",
+                disabled=position == active or position > available,
+            )
+        )
+    return Center(
+        Horizontal(*tabs, classes="step-tabs"),
+        classes="step-tabs-frame",
+    )
+
+
+class SetupScreen(Screen):
+    """Base screen that turns the setup rail into direct navigation tabs."""
+
+    def __init__(self, *, active_step: int, available_step: int) -> None:
+        super().__init__()
+        self.active_step = active_step
+        self.available_step = available_step
+
+    def current_selection(self) -> object | None:
+        """Return the current screen value so tab navigation does not lose it."""
+        return None
+
+    @on(Button.Pressed, ".step-tab")
+    def navigate_to_step(self, event: Button.Pressed) -> None:
+        if getattr(self, "_busy", False):
+            return
+        target = int((event.button.id or "").removeprefix("setup-tab-"))
+        if target <= self.available_step and target != self.active_step:
+            self.dismiss(SetupNavigation(target, self.current_selection()))
 
 
 @dataclass
@@ -74,6 +117,19 @@ class SetupSession:
     audio_input: AudioInput | None = None
     camera: Camera | None = None
     models: ModelSelection | None = None
+
+    @property
+    def available_step(self) -> int:
+        """Return the furthest setup tab whose prerequisites are complete."""
+        if self.audio_output is None:
+            return 1
+        if self.audio_input is None:
+            return 2
+        if self.camera is None:
+            return 3
+        if self.models is None:
+            return 4
+        return 5
 
     def build_context(self) -> Context:
         """Create the runtime context after every device is confirmed."""
@@ -120,21 +176,21 @@ class WelcomeScreen(Screen[bool]):
             with Vertical(classes="feature-list"):
                 with Horizontal(classes="feature-row"):
                     yield Digits("01", classes="feature-number")
-                    yield Label("AUDIO OUTPUT", classes="feature-title")
+                    yield Label("SPEAKER", classes="feature-title")
                     yield Static(
                         "Speakers · optional test",
                         classes="feature-copy",
                     )
                 with Horizontal(classes="feature-row"):
                     yield Digits("02", classes="feature-number")
-                    yield Label("AUDIO INPUT", classes="feature-title")
+                    yield Label("MIC", classes="feature-title")
                     yield Static(
                         "Microphone · optional test",
                         classes="feature-copy",
                     )
                 with Horizontal(classes="feature-row"):
                     yield Digits("03", classes="feature-number")
-                    yield Label("VIDEO INPUT", classes="feature-title")
+                    yield Label("VIDEO", classes="feature-title")
                     yield Static(
                         "Camera · optional test",
                         classes="feature-copy",
@@ -166,7 +222,7 @@ class WelcomeScreen(Screen[bool]):
         self.dismiss(True)
 
 
-class AudioOutputScreen(Screen[AudioOutput | None]):
+class AudioOutputScreen(SetupScreen):
     """Select an output and optionally play a cat sample."""
 
     class SampleFinished(Message):
@@ -174,8 +230,13 @@ class AudioOutputScreen(Screen[AudioOutput | None]):
             self.result = result
             super().__init__()
 
-    def __init__(self, selected_output: AudioOutput | None = None) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        selected_output: AudioOutput | None = None,
+        *,
+        available_step: int = 1,
+    ) -> None:
+        super().__init__(active_step=1, available_step=available_step)
         self.selected_output = selected_output
         self.outputs: dict[int, AudioOutputInfo] = {}
         self._busy = False
@@ -183,14 +244,14 @@ class AudioOutputScreen(Screen[AudioOutput | None]):
     def compose(self) -> ComposeResult:
         yield Header()
         with VerticalScroll(classes="wizard-card"):
-            yield _step_rail(1)
-            yield Static("01 / AUDIO OUTPUT", classes="eyebrow")
+            yield _step_tabs(1, self.available_step)
+            yield Static("01 / SPEAKER", classes="eyebrow")
             yield Static("Where should ODIA play sound?", classes="wizard-title")
             yield Static(
                 "Choose an output and continue, or optionally play the cat sample.",
                 classes="wizard-copy",
             )
-            yield Label("Audio output", classes="field-label")
+            yield Label("Speaker", classes="field-label")
             yield Select[int](
                 [],
                 prompt="Choose speakers or headphones",
@@ -210,7 +271,7 @@ class AudioOutputScreen(Screen[AudioOutput | None]):
                     variant="primary",
                     disabled=True,
                 )
-            yield Static("Finding audio outputs…", id="output-status", classes="status")
+            yield Static("Finding speakers…", id="output-status", classes="status")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -219,7 +280,7 @@ class AudioOutputScreen(Screen[AudioOutput | None]):
         except (RuntimeError, sd.PortAudioError) as error:
             outputs = []
             self.query_one("#output-status", Static).update(
-                f"Audio output discovery failed: {error}"
+                f"Speaker discovery failed: {error}"
             )
 
         self.outputs = {output.index: output for output in outputs}
@@ -239,7 +300,7 @@ class AudioOutputScreen(Screen[AudioOutput | None]):
             )
         else:
             self.query_one("#output-status", Static).update(
-                "No audio outputs were found."
+                "No speakers or headphones were found."
             )
 
     @on(Select.Changed, "#audio-output")
@@ -284,7 +345,7 @@ class AudioOutputScreen(Screen[AudioOutput | None]):
             )
         else:
             self.query_one("#output-status", Static).update(
-                f"Output test failed: {message.result.error}"
+                f"Speaker test failed: {message.result.error}"
             )
 
     @on(Button.Pressed, "#prev-output")
@@ -294,12 +355,20 @@ class AudioOutputScreen(Screen[AudioOutput | None]):
 
     @on(Button.Pressed, "#next-output")
     def finish_output(self) -> None:
+        selection = self.current_selection()
+        if selection is not None:
+            self.dismiss(selection)
+
+    def current_selection(self) -> AudioOutput | None:
         output_index = self.query_one("#audio-output", Select).selection
-        if output_index is not None:
-            self.dismiss(AudioOutput(self.outputs[output_index]))
+        return (
+            AudioOutput(self.outputs[output_index])
+            if output_index is not None
+            else None
+        )
 
 
-class AudioInputScreen(Screen[AudioInput | None]):
+class AudioInputScreen(SetupScreen):
     """Select an input and optionally record and play it back."""
 
     class LevelChanged(Message):
@@ -321,8 +390,10 @@ class AudioInputScreen(Screen[AudioInput | None]):
         self,
         audio_output: AudioOutput,
         selected_input: AudioInput | None = None,
+        *,
+        available_step: int = 2,
     ) -> None:
-        super().__init__()
+        super().__init__(active_step=2, available_step=available_step)
         self.audio_output = audio_output
         self.selected_input = selected_input
         self.inputs: dict[int, AudioInputInfo] = {}
@@ -334,18 +405,18 @@ class AudioInputScreen(Screen[AudioInput | None]):
     def compose(self) -> ComposeResult:
         yield Header()
         with VerticalScroll(classes="wizard-card"):
-            yield _step_rail(2)
-            yield Static("02 / AUDIO INPUT", classes="eyebrow")
+            yield _step_tabs(2, self.available_step)
+            yield Static("02 / MIC", classes="eyebrow")
             yield Static("Can ODIA hear you clearly?", classes="wizard-title")
             yield Static(
-                f"Playback output: [b]{self.audio_output.info.name}[/b]",
+                f"Playback speaker: [b]{self.audio_output.info.name}[/b]",
                 classes="device-badge",
             )
             yield Static(
                 "Choose an input and continue, or optionally record and play it back.",
                 classes="wizard-copy",
             )
-            yield Label("Audio input", classes="field-label")
+            yield Label("Microphone", classes="field-label")
             yield Select[int](
                 [],
                 prompt="Choose a microphone",
@@ -370,7 +441,7 @@ class AudioInputScreen(Screen[AudioInput | None]):
                     variant="primary",
                     disabled=True,
                 )
-            yield Static("Finding audio inputs…", id="input-status", classes="status")
+            yield Static("Finding microphones…", id="input-status", classes="status")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -379,7 +450,7 @@ class AudioInputScreen(Screen[AudioInput | None]):
         except (RuntimeError, sd.PortAudioError) as error:
             inputs = []
             self.query_one("#input-status", Static).update(
-                f"Audio input discovery failed: {error}"
+                f"Microphone discovery failed: {error}"
             )
 
         self.inputs = {audio_input.index: audio_input for audio_input in inputs}
@@ -394,7 +465,7 @@ class AudioInputScreen(Screen[AudioInput | None]):
                 self.selected_input.info.index
             )
         self.query_one("#input-status", Static).update(
-            "Select an input to begin." if inputs else "No audio inputs were found."
+            "Select a microphone to begin." if inputs else "No microphones were found."
         )
 
     @on(Select.Changed, "#audio-input")
@@ -528,16 +599,20 @@ class AudioInputScreen(Screen[AudioInput | None]):
 
     @on(Button.Pressed, "#next-input")
     def finish_input(self) -> None:
+        selection = self.current_selection()
+        if selection is not None:
+            self.dismiss(selection)
+
+    def current_selection(self) -> AudioInput | None:
         input_index = self.query_one("#audio-input", Select).selection
-        if input_index is not None:
-            self.dismiss(AudioInput(self.inputs[input_index]))
+        return AudioInput(self.inputs[input_index]) if input_index is not None else None
 
     def on_unmount(self) -> None:
         if self._stop_event is not None:
             self._stop_event.set()
 
 
-class CameraScreen(Screen[Camera | None]):
+class CameraScreen(SetupScreen):
     """Run separate still-camera and live-stream tests."""
 
     class CameraTestFinished(Message):
@@ -550,8 +625,13 @@ class CameraScreen(Screen[Camera | None]):
             self.result = result
             super().__init__()
 
-    def __init__(self, selected_camera: Camera | None = None) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        selected_camera: Camera | None = None,
+        *,
+        available_step: int = 3,
+    ) -> None:
+        super().__init__(active_step=3, available_step=available_step)
         self.selected_camera = selected_camera
         self.cameras: dict[int, CameraInfo] = {}
         self._busy = False
@@ -560,8 +640,8 @@ class CameraScreen(Screen[Camera | None]):
     def compose(self) -> ComposeResult:
         yield Header()
         with VerticalScroll(classes="wizard-card"):
-            yield _step_rail(3)
-            yield Static("03 / VIDEO INPUT", classes="eyebrow")
+            yield _step_tabs(3, self.available_step)
+            yield Static("03 / VIDEO", classes="eyebrow")
             yield Static("Can ODIA see the right view?", classes="wizard-title")
             yield Static(
                 "Choose a camera and continue, or optionally test its image and stream.",
@@ -708,16 +788,25 @@ class CameraScreen(Screen[Camera | None]):
 
     @on(Button.Pressed, "#next-camera")
     def finish_camera(self) -> None:
+        selection = self.current_selection()
+        if selection is not None:
+            self.dismiss(selection)
+
+    def current_selection(self) -> Camera | None:
         camera_index = self.query_one("#camera-input", Select).selection
-        if camera_index is not None:
-            self.dismiss(Camera(self.cameras[camera_index]))
+        return Camera(self.cameras[camera_index]) if camera_index is not None else None
 
 
-class ModelSelectionScreen(Screen[ModelSelection | None]):
+class ModelSelectionScreen(SetupScreen):
     """Choose the vision and voice model presets for this run."""
 
-    def __init__(self, selected_models: ModelSelection | None = None) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        selected_models: ModelSelection | None = None,
+        *,
+        available_step: int = 4,
+    ) -> None:
+        super().__init__(active_step=4, available_step=available_step)
         self.selected_models = selected_models or ModelSelection()
 
     def compose(self) -> ComposeResult:
@@ -726,7 +815,7 @@ class ModelSelectionScreen(Screen[ModelSelection | None]):
 
         yield Header()
         with VerticalScroll(classes="wizard-card"):
-            yield _step_rail(4)
+            yield _step_tabs(4, self.available_step)
             yield Static("04 / AI MODELS", classes="eyebrow")
             yield Static("How should ODIA see and listen?", classes="wizard-title")
             yield Static(
@@ -803,24 +892,26 @@ class ModelSelectionScreen(Screen[ModelSelection | None]):
 
     @on(Button.Pressed, "#next-models")
     def finish_models(self) -> None:
+        selection = self.current_selection()
+        if selection is not None:
+            self.dismiss(selection)
+
+    def current_selection(self) -> ModelSelection | None:
         vision_id = self.query_one("#vision-model", Select).selection
         voice_id = self.query_one("#voice-model", Select).selection
         if vision_id is None or voice_id is None:
-            return
-
-        self.dismiss(
-            ModelSelection(
-                vision_id=vision_id,
-                voice_id=voice_id,
-            )
+            return None
+        return ModelSelection(
+            vision_id=vision_id,
+            voice_id=voice_id,
         )
 
 
-class SummaryScreen(Screen[Context | None]):
+class SummaryScreen(SetupScreen):
     """Present the confirmed selections as the final setup dashboard."""
 
     def __init__(self, session: SetupSession) -> None:
-        super().__init__()
+        super().__init__(active_step=5, available_step=5)
         self.session = session
 
     def compose(self) -> ComposeResult:
@@ -846,7 +937,7 @@ class SummaryScreen(Screen[Context | None]):
 
         yield Header()
         with VerticalScroll(classes="wizard-card summary-card"):
-            yield _step_rail(5)
+            yield _step_tabs(5, self.available_step)
             yield Static("✓", classes="success-mark")
             yield Static("ODIA Ready", classes="wizard-title summary-title")
             yield Static(
@@ -859,14 +950,14 @@ class SummaryScreen(Screen[Context | None]):
                     yield Static("SELECTION", classes="summary-table-value")
                     yield Static("DETAIL", classes="summary-table-detail")
                 with Horizontal(classes="summary-table-row"):
-                    yield Static("✓  AUDIO OUTPUT", classes="summary-table-label")
+                    yield Static("✓  SPEAKER", classes="summary-table-label")
                     yield Static(output.name, classes="summary-table-value")
                     yield Static(
                         f"{output.channels} ch · {output.samplerate / 1000:g} kHz",
                         classes="summary-table-detail",
                     )
                 with Horizontal(classes="summary-table-row"):
-                    yield Static("✓  AUDIO INPUT", classes="summary-table-label")
+                    yield Static("✓  MIC", classes="summary-table-label")
                     yield Static(audio_input.name, classes="summary-table-value")
                     yield Static(
                         f"{audio_input.channels} ch · "
@@ -874,7 +965,7 @@ class SummaryScreen(Screen[Context | None]):
                         classes="summary-table-detail",
                     )
                 with Horizontal(classes="summary-table-row"):
-                    yield Static("✓  VIDEO INPUT", classes="summary-table-label")
+                    yield Static("✓  VIDEO", classes="summary-table-label")
                     yield Static(camera.name, classes="summary-table-value")
                     yield Static(
                         "Snapshot · Stream",

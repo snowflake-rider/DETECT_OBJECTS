@@ -77,13 +77,14 @@ class RuntimeWindowTests(unittest.TestCase):
         video_panel = self.window.findChild(QLabel, "video-panel")
         self.assertGreaterEqual(video_panel.minimumWidth(), 640)
         self.assertGreaterEqual(video_panel.minimumHeight(), 360)
-        listen_button = self.window.findChild(QPushButton, "toggle-whisper")
-        self.assertIs(listen_button.parent(), top_rail)
-        self.assertEqual(listen_button.text(), "Start listening")
-        pause_button = self.window.findChild(QPushButton, "toggle-preview")
+        mic_button = self.window.findChild(QPushButton, "toggle-whisper")
+        self.assertIs(mic_button.parent(), top_rail)
+        self.assertEqual(mic_button.text(), "Mic Resume")
+        camera_button = self.window.findChild(QPushButton, "toggle-preview")
+        self.assertEqual(camera_button.text(), "Camera Pause")
         quit_button = self.window.findChild(QPushButton, "quit-runtime")
-        self.assertLess(pause_button.x(), listen_button.x())
-        self.assertLess(listen_button.x(), quit_button.x())
+        self.assertLess(camera_button.x(), mic_button.x())
+        self.assertLess(mic_button.x(), quit_button.x())
 
     def test_window_shows_devices_and_models_selected_in_setup(self) -> None:
         context = Context(
@@ -132,7 +133,7 @@ class RuntimeWindowTests(unittest.TestCase):
         self.assertTrue(self.window.isVisible())
         self.assertEqual(
             self.window.findChild(QPushButton, "toggle-preview").text(),
-            "Resume",
+            "Camera Resume",
         )
 
     def test_window_shows_model_and_detection_updates(self) -> None:
@@ -168,13 +169,22 @@ class RuntimeWindowTests(unittest.TestCase):
         self.application.processEvents()
 
         self.assertFalse(self.window.video_stream.is_running)
-        self.assertEqual(toggle.text(), "Resume")
+        self.assertEqual(toggle.text(), "Camera Resume")
 
         QTest.mouseClick(toggle, Qt.MouseButton.LeftButton)
         self.application.processEvents()
 
         self.assertTrue(self.window.video_stream.is_running)
-        self.assertEqual(toggle.text(), "Pause")
+        self.assertEqual(toggle.text(), "Camera Pause")
+
+    def test_mic_button_names_the_next_audio_action(self) -> None:
+        toggle = self.window.findChild(QPushButton, "toggle-whisper")
+
+        self.window.show_whisper_status("Listening")
+        self.assertEqual(toggle.text(), "Mic Pause")
+
+        self.window.show_whisper_status("Off")
+        self.assertEqual(toggle.text(), "Mic Resume")
 
     def test_user_can_submit_a_typed_command(self) -> None:
         commands: list[str] = []

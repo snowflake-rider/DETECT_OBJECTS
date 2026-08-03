@@ -1,1 +1,1 @@
-"""Tests for session-based snapshot stories."""
+"""Tests for session-based object-crop stories."""

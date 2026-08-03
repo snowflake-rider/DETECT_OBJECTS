@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt, QTimer, Signal, Slot
+from PySide6.QtCore import QSignalBlocker, QSize, Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QCloseEvent, QIcon, QImage, QPixmap, QResizeEvent
 from PySide6.QtWidgets import (
     QFrame,
@@ -25,7 +26,7 @@ from ..device_setup.context import Context
 from ..models.catalog import get_model_option
 from ..paths import PROJECT_ROOT
 from ..story.generator import StoryGenerator, StoryResult, create_story_generator
-from ..story.session import SessionRecorder, SnapshotEvent
+from ..story.session import CropEvent, SessionRecorder
 from ..story.worker import StoryWorker
 from ..voice_text_convert.parse_and_match_module import Text_Manager
 from .camera_video import CameraVideoStream
@@ -129,46 +130,57 @@ class RuntimeWindow(QMainWindow):
         main_column.addWidget(self._build_video_panel(), stretch=1)
         main_column.addWidget(self._build_command_dock())
         body.addLayout(main_column, stretch=1)
-        body.addWidget(self._build_snapshot_sidebar())
+        body.addWidget(self._build_crop_sidebar())
         page.addLayout(body, stretch=1)
 
         return content
 
-    def _build_snapshot_sidebar(self) -> QFrame:
+    def _build_crop_sidebar(self) -> QFrame:
         sidebar = QFrame()
-        sidebar.setObjectName("snapshot-sidebar")
+        sidebar.setObjectName("object-crop-sidebar")
         sidebar.setMinimumWidth(260)
         sidebar.setMaximumWidth(320)
         layout = QVBoxLayout(sidebar)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(10)
 
-        heading = QLabel("SESSION SNAPSHOTS")
+        heading = QLabel("STORY OBJECT CROPS")
         heading.setObjectName("status-heading")
         layout.addWidget(heading)
 
-        preview = QLabel("Click a detected snapshot to inspect it")
-        preview.setObjectName("snapshot-preview")
+        queue_status = QLabel("0 crops queued for Codex")
+        queue_status.setObjectName("crop-queue-status")
+        layout.addWidget(queue_status)
+
+        preview = QLabel("Click an object crop to inspect it")
+        preview.setObjectName("crop-preview")
         preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         preview.setMinimumHeight(170)
         preview.setWordWrap(True)
         layout.addWidget(preview)
 
-        details = QLabel("No snapshot selected")
-        details.setObjectName("snapshot-details")
+        details = QLabel("No object crop selected")
+        details.setObjectName("crop-details")
         details.setWordWrap(True)
         layout.addWidget(details)
 
         gallery = QListWidget()
-        gallery.setObjectName("snapshot-gallery")
+        gallery.setObjectName("crop-gallery")
         gallery.setViewMode(QListView.ViewMode.IconMode)
         gallery.setResizeMode(QListView.ResizeMode.Adjust)
         gallery.setMovement(QListView.Movement.Static)
         gallery.setIconSize(QSize(104, 64))
         gallery.setSpacing(6)
         gallery.setWordWrap(True)
-        gallery.itemClicked.connect(self._show_snapshot)
+        gallery.itemClicked.connect(self._show_crop)
+        gallery.itemChanged.connect(self._crop_selection_changed)
         layout.addWidget(gallery, stretch=1)
+
+        remove_button = QPushButton("Remove crop")
+        remove_button.setObjectName("remove-crop")
+        remove_button.setEnabled(False)
+        remove_button.clicked.connect(self._remove_selected_crop)
+        layout.addWidget(remove_button)
         return sidebar
 
     def _build_top_rail(self) -> QFrame:
@@ -190,15 +202,15 @@ class RuntimeWindow(QMainWindow):
         primary_row.addWidget(live_status)
         primary_row.addStretch()
 
-        preview_button = QPushButton("Pause")
+        preview_button = QPushButton("Camera Pause")
         preview_button.setObjectName("toggle-preview")
         preview_button.clicked.connect(self._toggle_preview)
         primary_row.addWidget(preview_button)
 
-        listen_button = QPushButton("Start listening")
+        listen_button = QPushButton("Mic Resume")
         listen_button.setObjectName("toggle-whisper")
         listen_button.setToolTip(
-            "Start or stop Whisper voice instructions. Text input remains available."
+            "Resume or pause microphone listening. Text input remains available."
         )
         listen_button.clicked.connect(self._toggle_whisper)
         listen_button.setEnabled(self._whisper_stream is not None)
@@ -420,7 +432,7 @@ class RuntimeWindow(QMainWindow):
         story_row.addWidget(story_image)
 
         story_output = QLabel(
-            "Matched snapshots will become a short story for this session."
+            "Selected object crops will become a short story for this session."
         )
         story_output.setObjectName("story-output")
         story_output.setWordWrap(True)
@@ -509,21 +521,21 @@ class RuntimeWindow(QMainWindow):
             self._whisper_stream.stop()
             return
 
-        button.setText("Stop listening")
+        button.setText("Mic Pause")
         self._whisper_stream.start()
 
     def _toggle_preview(self) -> None:
         preview_button = self.findChild(QPushButton, "toggle-preview")
         if self._video_stream.is_running:
             self._video_stream.stop()
-            preview_button.setText("Resume")
+            preview_button.setText("Camera Resume")
             self.findChild(QLabel, "live-status").setText("● PAUSED")
             self.findChild(QLabel, "camera-runtime-status").setText("Paused")
             self.findChild(QLabel, "yolo-status").setText("Stopped")
             return
 
         self._video_stream.start()
-        preview_button.setText("Pause")
+        preview_button.setText("Camera Pause")
         self.findChild(QLabel, "live-status").setText("● LIVE")
         self.findChild(QLabel, "camera-runtime-status").setText("Opening…")
 
@@ -536,20 +548,20 @@ class RuntimeWindow(QMainWindow):
 
     @Slot(QImage, object)
     def record_story_frame(self, image: QImage, detections: object) -> None:
-        """Save a detection frame when it matches the latest instruction."""
+        """Save matching YOLO box crops from the unannotated camera frame."""
         try:
-            event = self._session_recorder.record_detection(image, detections)
+            events = self._session_recorder.record_detection(image, detections)
         except (OSError, TypeError, ValueError) as error:
             self.findChild(QLabel, "story-output").setText(
-                f"Could not save snapshot: {error}"
+                f"Could not save object crop: {error}"
             )
             return
 
-        if event is not None:
-            self._add_snapshot(event)
+        for event in events:
+            self._add_crop(event)
 
-    def _add_snapshot(self, event: SnapshotEvent) -> None:
-        snapshot_path = self._session_recorder.session_dir / event.snapshot
+    def _add_crop(self, event: CropEvent) -> None:
+        crop_path = self._session_recorder.session_dir / event.crop
         object_summary = " · ".join(
             f"{found.class_name.upper()} {found.confidence:.0%}"
             for found in event.objects
@@ -557,22 +569,27 @@ class RuntimeWindow(QMainWindow):
         captured_at = datetime.fromisoformat(event.timestamp).astimezone(timezone.utc)
         details = f"{object_summary}\n{captured_at:%Y-%m-%d %H:%M:%S UTC}"
 
-        thumbnail = QPixmap(str(snapshot_path)).scaled(
+        thumbnail = QPixmap(str(crop_path)).scaled(
             QSize(104, 64),
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation,
         )
         item = QListWidgetItem(QIcon(thumbnail), object_summary)
-        item.setData(Qt.ItemDataRole.UserRole, str(snapshot_path))
+        item.setData(Qt.ItemDataRole.UserRole, str(crop_path))
         item.setData(Qt.ItemDataRole.UserRole + 1, details)
+        item.setCheckState(Qt.CheckState.Checked)
         item.setToolTip(details)
-        self.findChild(QListWidget, "snapshot-gallery").addItem(item)
+        gallery = self.findChild(QListWidget, "crop-gallery")
+        blocker = QSignalBlocker(gallery)
+        gallery.addItem(item)
+        del blocker
+        self._refresh_crop_queue_status()
 
     @Slot(object)
-    def _show_snapshot(self, item: QListWidgetItem) -> None:
-        snapshot_path = item.data(Qt.ItemDataRole.UserRole)
-        preview = self.findChild(QLabel, "snapshot-preview")
-        pixmap = QPixmap(snapshot_path)
+    def _show_crop(self, item: QListWidgetItem) -> None:
+        crop_path = item.data(Qt.ItemDataRole.UserRole)
+        preview = self.findChild(QLabel, "crop-preview")
+        pixmap = QPixmap(crop_path)
         preview.setText("")
         preview.setPixmap(
             pixmap.scaled(
@@ -581,16 +598,63 @@ class RuntimeWindow(QMainWindow):
                 Qt.TransformationMode.SmoothTransformation,
             )
         )
-        self.findChild(QLabel, "snapshot-details").setText(
+        self.findChild(QLabel, "crop-details").setText(
             item.data(Qt.ItemDataRole.UserRole + 1)
+        )
+        self.findChild(QPushButton, "remove-crop").setEnabled(True)
+
+    @Slot(object)
+    def _crop_selection_changed(self, item: QListWidgetItem) -> None:
+        crop_path = Path(item.data(Qt.ItemDataRole.UserRole))
+        try:
+            self._session_recorder.set_crop_selected(
+                crop_path,
+                item.checkState() == Qt.CheckState.Checked,
+            )
+        except ValueError as error:
+            self.findChild(QLabel, "story-output").setText(
+                f"Could not update Story crop queue: {error}"
+            )
+        self._refresh_crop_queue_status()
+
+    def _remove_selected_crop(self) -> None:
+        gallery = self.findChild(QListWidget, "crop-gallery")
+        item = gallery.currentItem()
+        if item is None:
+            return
+        crop_path = Path(item.data(Qt.ItemDataRole.UserRole))
+        try:
+            self._session_recorder.remove_crop(crop_path)
+        except (OSError, ValueError) as error:
+            self.findChild(QLabel, "story-output").setText(
+                f"Could not remove object crop: {error}"
+            )
+            return
+
+        row = gallery.row(item)
+        gallery.takeItem(row)
+        self.findChild(QLabel, "crop-preview").setPixmap(QPixmap())
+        self.findChild(QLabel, "crop-preview").setText("No object crop selected")
+        self.findChild(QLabel, "crop-details").setText("No object crop selected")
+        self.findChild(QPushButton, "remove-crop").setEnabled(False)
+        self._refresh_crop_queue_status()
+
+    def _refresh_crop_queue_status(self) -> None:
+        gallery = self.findChild(QListWidget, "crop-gallery")
+        selected = sum(
+            gallery.item(index).checkState() == Qt.CheckState.Checked
+            for index in range(gallery.count())
+        )
+        self.findChild(QLabel, "crop-queue-status").setText(
+            f"{selected} of {gallery.count()} crops queued for Codex"
         )
 
     def _generate_story(self) -> None:
         story_output = self.findChild(QLabel, "story-output")
         story_button = self.findChild(QPushButton, "generate-story")
-        if not self._session_recorder.has_snapshots:
+        if not self._session_recorder.selected_crop_paths:
             story_output.setText(
-                "No matching snapshots yet. Speak an object name and find it first."
+                "Select at least one object crop before generating a Story."
             )
             return
         if self._story_worker is not None and self._story_worker.isRunning():
@@ -598,6 +662,8 @@ class RuntimeWindow(QMainWindow):
 
         story_button.setEnabled(False)
         story_output.setText("Writing a story with Codex…")
+        self.findChild(QListWidget, "crop-gallery").setEnabled(False)
+        self.findChild(QPushButton, "remove-crop").setEnabled(False)
         worker = StoryWorker(
             self._story_generator,
             self._session_recorder.session_dir,
@@ -635,6 +701,11 @@ class RuntimeWindow(QMainWindow):
 
     @Slot()
     def _story_worker_finished(self) -> None:
+        gallery = self.findChild(QListWidget, "crop-gallery")
+        gallery.setEnabled(True)
+        self.findChild(QPushButton, "remove-crop").setEnabled(
+            gallery.currentItem() is not None
+        )
         if self._story_worker is not None:
             self._story_worker.deleteLater()
         self._story_worker = None
@@ -648,7 +719,7 @@ class RuntimeWindow(QMainWindow):
         video_panel = self.findChild(QLabel, "video-panel")
         video_panel.setPixmap(QPixmap())
         video_panel.setText(f"Camera preview unavailable\n{message}")
-        self.findChild(QPushButton, "toggle-preview").setText("Resume")
+        self.findChild(QPushButton, "toggle-preview").setText("Camera Resume")
         self.findChild(QLabel, "live-status").setText("● ERROR")
         self.findChild(QLabel, "camera-runtime-status").setText("Error")
         self.findChild(QLabel, "camera-runtime-status").setToolTip(message)
@@ -665,9 +736,9 @@ class RuntimeWindow(QMainWindow):
         self.findChild(QLabel, "whisper-status").setText(status)
         button = self.findChild(QPushButton, "toggle-whisper")
         if status == "Listening":
-            button.setText("Stop listening")
+            button.setText("Mic Pause")
         elif status in {"Off", "Error"}:
-            button.setText("Start listening")
+            button.setText("Mic Resume")
             button.setEnabled(False)
 
     @Slot(str)
@@ -681,7 +752,7 @@ class RuntimeWindow(QMainWindow):
     @Slot()
     def _whisper_finished(self) -> None:
         button = self.findChild(QPushButton, "toggle-whisper")
-        button.setText("Start listening")
+        button.setText("Mic Resume")
         button.setEnabled(True)
 
     @Slot(int, str)
@@ -741,7 +812,7 @@ class RuntimeWindow(QMainWindow):
             border: 1px solid #272c34;
             border-radius: 8px;
         }
-        QFrame#snapshot-sidebar {
+        QFrame#object-crop-sidebar {
             background: #111419;
             border: 1px solid #272c34;
             border-radius: 8px;
@@ -845,31 +916,36 @@ class RuntimeWindow(QMainWindow):
             color: #c9cfda;
             font-style: italic;
         }
-        QLabel#snapshot-preview {
+        QLabel#crop-preview {
             background: #050608;
             border: 1px solid #343a44;
             border-radius: 6px;
             color: #747e8d;
             padding: 6px;
         }
-        QLabel#snapshot-details {
+        QLabel#crop-details {
             color: #c9cfda;
             font-size: 12px;
             font-weight: 700;
         }
-        QListWidget#snapshot-gallery {
+        QLabel#crop-queue-status {
+            color: #8265d6;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        QListWidget#crop-gallery {
             background: #090b0e;
             border: 1px solid #343a44;
             border-radius: 6px;
             color: #c9cfda;
             outline: none;
         }
-        QListWidget#snapshot-gallery::item {
+        QListWidget#crop-gallery::item {
             border: 1px solid transparent;
             border-radius: 5px;
             padding: 5px;
         }
-        QListWidget#snapshot-gallery::item:selected {
+        QListWidget#crop-gallery::item:selected {
             background: #302653;
             border-color: #8265d6;
             color: #ffffff;

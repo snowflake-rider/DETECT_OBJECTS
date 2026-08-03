@@ -31,6 +31,10 @@ be able to connect with key authentication, and Remote Login must be enabled on
 the Codex host. Setup verifies both the remote executable and `codex login
 status` before starting ODIA.
 
+For local Story generation, ODIA also checks the common Homebrew and user-local
+Codex locations. It adds the selected Codex directory to the child process PATH
+so a GUI-launched app can find both the Codex script and its Node runtime.
+
 For each Story request, ODIA streams `events.json`, snapshots, the prompt, and
 the output schema into a temporary directory on the Codex host. Codex runs
 ephemerally with a read-only sandbox; the remote temporary directory is removed

@@ -139,6 +139,7 @@ class CameraVideoStream(QThread):
                     return
 
                 detections: list[Detection] = []
+                detection_image = None
                 if self._detector is not None:
                     with self._pending_classes_lock:
                         try:
@@ -152,7 +153,10 @@ class CameraVideoStream(QThread):
                     if classes is not None:
                         self._detector.set_classes(classes)
                         self.active_classes_changed.emit(classes)
+                    source_frame = frame.copy()
                     frame, detections = self._detector.process(frame)
+                    if detections:
+                        detection_image = frame_to_qimage(source_frame)
                     summary = " · ".join(
                         format_detection_label(
                             detection.class_name,
@@ -166,8 +170,8 @@ class CameraVideoStream(QThread):
                     )
                 image = frame_to_qimage(frame)
                 self.frame_ready.emit(image)
-                if detections:
-                    self.detection_frame_ready.emit(image, detections)
+                if detection_image is not None:
+                    self.detection_frame_ready.emit(detection_image, detections)
         except (cv2.error, OSError, RuntimeError, TypeError, ValueError) as error:
             self.error.emit(f"Desktop preview failed: {error}")
         finally:

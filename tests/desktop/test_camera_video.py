@@ -66,7 +66,9 @@ class MemoryDetector:
 
     def process(self, frame: np.ndarray):
         self.processed_frames += 1
-        return frame, [
+        annotated = frame.copy()
+        annotated.fill(255)
+        return annotated, [
             Detection(
                 bounds=(0, 0, 1, 1),
                 class_name="person",
@@ -122,6 +124,7 @@ class CameraVideoStreamTests(unittest.TestCase):
         model_statuses = []
         detection_summaries = []
         detection_frames = []
+        preview_frames = []
         stream = CameraVideoStream(
             index=3,
             backend=1200,
@@ -130,6 +133,7 @@ class CameraVideoStreamTests(unittest.TestCase):
             detector=detector,
         )
         stream.model_status.connect(lambda status: model_statuses.append(status))
+        stream.frame_ready.connect(preview_frames.append)
         stream.detections_ready.connect(
             lambda count, summary: detection_summaries.append((count, summary))
         )
@@ -150,6 +154,8 @@ class CameraVideoStreamTests(unittest.TestCase):
         self.assertGreaterEqual(len(detection_frames), 1)
         image, detections = detection_frames[0]
         self.assertFalse(image.isNull())
+        self.assertEqual(image.pixelColor(0, 0), QColor(0, 0, 0))
+        self.assertEqual(preview_frames[0].pixelColor(0, 0), QColor(255, 255, 255))
         self.assertEqual(detections[0].class_name, "person")
 
     def test_keyword_queue_reports_pending_and_activated_classes(self) -> None:

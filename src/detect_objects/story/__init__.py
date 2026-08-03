@@ -7,13 +7,13 @@ from .generator import (
     StoryResult,
     create_story_generator,
 )
-from .session import SessionRecorder, SnapshotEvent
+from .session import CropEvent, SessionRecorder
 
 __all__ = [
     "CodexStoryGenerator",
+    "CropEvent",
     "SshCodexStoryGenerator",
     "SessionRecorder",
-    "SnapshotEvent",
     "StoryGenerationError",
     "StoryResult",
     "create_story_generator",

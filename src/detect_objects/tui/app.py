@@ -15,6 +15,7 @@ from .device_setup_screen import (
     AudioOutputScreen,
     CameraScreen,
     ModelSelectionScreen,
+    SetupNavigation,
     SetupSession,
     SummaryScreen,
     WelcomeScreen,
@@ -183,10 +184,37 @@ class OdiaApp(App[Context | None]):
         text-align: right;
     }
 
-    .step-rail {
+    .step-tabs-frame {
         width: 100%;
-        text-align: center;
-        margin-bottom: 2;
+        height: 3;
+        margin-bottom: 0;
+    }
+
+    .step-tabs {
+        width: 76;
+        max-width: 100%;
+        height: 3;
+    }
+
+    .step-tab {
+        width: 1fr;
+        min-width: 0;
+        height: 3;
+        margin: 0 1;
+        border: none;
+        background: $boost;
+        color: $text-muted;
+    }
+
+    .step-tab-complete {
+        color: $success;
+    }
+
+    .step-tab-current {
+        color: $accent;
+        text-style: bold;
+        border-bottom: heavy $accent;
+        opacity: 100%;
     }
 
     .eyebrow {
@@ -310,69 +338,108 @@ class OdiaApp(App[Context | None]):
 
     def _welcome_finished(self, started: bool) -> None:
         if started:
-            self.push_screen(
-                AudioOutputScreen(self.session.audio_output),
-                self._audio_output_finished,
-            )
+            self._open_setup_step(1)
 
-    def _audio_output_finished(self, audio_output: AudioOutput | None) -> None:
+    def _open_setup_step(self, step: int) -> None:
+        """Open one setup tab after validating its prerequisites."""
+        if step < 1 or step > self.session.available_step:
+            raise ValueError(f"Setup step {step} is not available yet.")
+        if step == 1:
+            screen = AudioOutputScreen(
+                self.session.audio_output,
+                available_step=self.session.available_step,
+            )
+            callback = self._audio_output_finished
+        elif step == 2:
+            if self.session.audio_output is None:
+                raise RuntimeError("Speaker selection is required before mic setup.")
+            screen = AudioInputScreen(
+                self.session.audio_output,
+                self.session.audio_input,
+                available_step=self.session.available_step,
+            )
+            callback = self._audio_input_finished
+        elif step == 3:
+            screen = CameraScreen(
+                self.session.camera,
+                available_step=self.session.available_step,
+            )
+            callback = self._camera_finished
+        elif step == 4:
+            screen = ModelSelectionScreen(
+                self.session.models,
+                available_step=self.session.available_step,
+            )
+            callback = self._models_finished
+        else:
+            screen = SummaryScreen(self.session)
+            callback = self.finish_device_setup
+        self.push_screen(screen, callback)
+
+    def _apply_navigation(self, navigation: SetupNavigation) -> None:
+        """Preserve the current selection and open the requested setup tab."""
+        value = navigation.value
+        if isinstance(value, AudioOutput):
+            self.session.audio_output = value
+        elif isinstance(value, AudioInput):
+            self.session.audio_input = value
+        elif isinstance(value, Camera):
+            self.session.camera = value
+        elif isinstance(value, ModelSelection):
+            self.session.models = value
+        self._open_setup_step(navigation.step)
+
+    def _audio_output_finished(
+        self, audio_output: AudioOutput | SetupNavigation | None
+    ) -> None:
+        if isinstance(audio_output, SetupNavigation):
+            self._apply_navigation(audio_output)
+            return
         if audio_output is None:
             self.push_screen(WelcomeScreen(), self._welcome_finished)
             return
         self.session.audio_output = audio_output
-        self.push_screen(
-            AudioInputScreen(audio_output, self.session.audio_input),
-            self._audio_input_finished,
-        )
+        self._open_setup_step(2)
 
-    def _audio_input_finished(self, audio_input: AudioInput | None) -> None:
+    def _audio_input_finished(
+        self, audio_input: AudioInput | SetupNavigation | None
+    ) -> None:
+        if isinstance(audio_input, SetupNavigation):
+            self._apply_navigation(audio_input)
+            return
         if audio_input is None:
-            self.push_screen(
-                AudioOutputScreen(self.session.audio_output),
-                self._audio_output_finished,
-            )
+            self._open_setup_step(1)
             return
         self.session.audio_input = audio_input
-        self.push_screen(
-            CameraScreen(self.session.camera),
-            self._camera_finished,
-        )
+        self._open_setup_step(3)
 
-    def _camera_finished(self, camera: Camera | None) -> None:
+    def _camera_finished(self, camera: Camera | SetupNavigation | None) -> None:
+        if isinstance(camera, SetupNavigation):
+            self._apply_navigation(camera)
+            return
         if camera is None:
-            if self.session.audio_output is None:
-                raise RuntimeError("Audio output is required before camera setup.")
-            self.push_screen(
-                AudioInputScreen(
-                    self.session.audio_output,
-                    self.session.audio_input,
-                ),
-                self._audio_input_finished,
-            )
+            self._open_setup_step(2)
             return
         self.session.camera = camera
-        self.push_screen(
-            ModelSelectionScreen(self.session.models),
-            self._models_finished,
-        )
+        self._open_setup_step(4)
 
-    def _models_finished(self, models: ModelSelection | None) -> None:
+    def _models_finished(self, models: ModelSelection | SetupNavigation | None) -> None:
+        if isinstance(models, SetupNavigation):
+            self._apply_navigation(models)
+            return
         if models is None:
-            self.push_screen(
-                CameraScreen(self.session.camera),
-                self._camera_finished,
-            )
+            self._open_setup_step(3)
             return
         self.session.models = models
-        self.push_screen(SummaryScreen(self.session), self.finish_device_setup)
+        self._open_setup_step(5)
 
-    def finish_device_setup(self, context: Context | None) -> None:
+    def finish_device_setup(self, context: Context | SetupNavigation | None) -> None:
         """Ask how to launch after every device and model is confirmed."""
+        if isinstance(context, SetupNavigation):
+            self._apply_navigation(context)
+            return
         if context is None:
-            self.push_screen(
-                ModelSelectionScreen(self.session.models),
-                self._models_finished,
-            )
+            self._open_setup_step(4)
             return
         self._completed_context = context
         self.push_screen(RuntimeModeScreen(), self._runtime_mode_finished)
@@ -443,8 +510,8 @@ def main() -> int:
         return 1
 
     print(f"Camera: {context.camera.info.name}")
-    print(f"Audio input: {context.audio_input.info.name}")
-    print(f"Audio output: {context.audio_output.info.name}")
+    print(f"Microphone: {context.audio_input.info.name}")
+    print(f"Speaker: {context.audio_output.info.name}")
     print(f"Vision model: {context.models.vision_id}")
     print(f"Voice model: {context.models.voice_id}")
     return 0

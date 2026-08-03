@@ -132,7 +132,7 @@ esac
 if [[ -n "${codex_ssh_target}" ]]; then
     printf 'Checking Codex SSH target: %s\n' "${codex_ssh_target}"
     ssh_options=(-o BatchMode=yes -o ConnectTimeout=10)
-    remote_codex_probe='if command -v codex >/dev/null 2>&1; then command -v codex; elif [ -x /opt/homebrew/bin/codex ]; then printf "%s\n" /opt/homebrew/bin/codex; elif [ -x "$HOME/.local/bin/codex" ]; then printf "%s\n" "$HOME/.local/bin/codex"; else exit 127; fi'
+    remote_codex_probe='if command -v codex >/dev/null 2>&1; then command -v codex; elif [ -x "$HOME/.local/bin/codex" ]; then printf "%s\n" "$HOME/.local/bin/codex"; elif [ -x /opt/homebrew/bin/codex ]; then printf "%s\n" /opt/homebrew/bin/codex; elif [ -x /usr/local/bin/codex ]; then printf "%s\n" /usr/local/bin/codex; else exit 127; fi'
 
     if ! remote_codex_executable="$(
         ssh "${ssh_options[@]}" "${codex_ssh_target}" "${remote_codex_probe}"
@@ -145,8 +145,9 @@ if [[ -n "${codex_ssh_target}" ]]; then
         echo "Codex SSH target returned an unsafe executable path." >&2
         exit 1
     fi
+    remote_codex_directory="${remote_codex_executable%/*}"
     if ! ssh "${ssh_options[@]}" "${codex_ssh_target}" \
-        "${remote_codex_executable}" login status; then
+        "PATH=${remote_codex_directory}:\$PATH ${remote_codex_executable} login status"; then
         echo "Codex is not authenticated on SSH target '${codex_ssh_target}'." >&2
         exit 1
     fi

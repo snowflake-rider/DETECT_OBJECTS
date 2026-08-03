@@ -94,11 +94,71 @@ class OdiaAppTests(unittest.IsolatedAsyncioTestCase):
             numbers = [str(widget.value) for widget in app.screen.query(Digits)]
             self.assertEqual(numbers, ["01", "02", "03", "04"])
             labels = " ".join(str(widget.content) for widget in app.screen.query(Label))
-            self.assertIn("AUDIO OUTPUT", labels)
-            self.assertIn("AUDIO INPUT", labels)
-            self.assertIn("VIDEO INPUT", labels)
+            self.assertIn("SPEAKER", labels)
+            self.assertIn("MIC", labels)
+            self.assertIn("VIDEO", labels)
             self.assertIn("AI MODELS", labels)
             self.assertIsNotNone(app.screen.query_one("#begin-setup", Button))
+
+    async def test_completed_setup_steps_can_be_opened_from_tabs(self) -> None:
+        with (
+            patch.object(AudioOutput, "list_devices", return_value=[self.audio_output]),
+            patch.object(AudioInput, "list_devices", return_value=[self.audio_input]),
+            patch.object(Camera, "list_devices", return_value=[self.camera]),
+        ):
+            app = OdiaApp()
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.click("#begin-setup")
+                await pilot.pause()
+
+                self.assertTrue(app.screen.query_one("#setup-tab-1", Button).disabled)
+                self.assertTrue(app.screen.query_one("#setup-tab-2", Button).disabled)
+                expected_tab_width = app.screen.query_one(
+                    "#setup-tab-1", Button
+                ).region.width
+                app.screen.query_one("#audio-output", Select).value = (
+                    self.audio_output.index
+                )
+                await pilot.pause()
+                await pilot.click("#next-output")
+                await pilot.pause()
+
+                self.assertIsInstance(app.screen, AudioInputScreen)
+                self.assertFalse(app.screen.query_one("#setup-tab-1", Button).disabled)
+                self.assertTrue(app.screen.query_one("#setup-tab-2", Button).disabled)
+                app.screen.query_one("#audio-input", Select).value = (
+                    self.audio_input.index
+                )
+                await pilot.pause()
+                await pilot.click("#next-input")
+                await pilot.pause()
+
+                self.assertIsInstance(app.screen, CameraScreen)
+                self.assertTrue(app.screen.query_one("#setup-tab-3", Button).disabled)
+                await pilot.click("#setup-tab-1")
+                await pilot.pause()
+
+                self.assertIsInstance(app.screen, AudioOutputScreen)
+                self.assertEqual(
+                    app.screen.query_one("#audio-output", Select).selection,
+                    self.audio_output.index,
+                )
+                self.assertFalse(app.screen.query_one("#setup-tab-3", Button).disabled)
+                await pilot.click("#setup-tab-3")
+                await pilot.pause()
+
+                self.assertIsInstance(app.screen, CameraScreen)
+                app.screen.query_one("#camera-input", Select).value = self.camera.index
+                await pilot.pause()
+                await pilot.click("#next-camera")
+                await pilot.pause()
+                await pilot.click("#next-models")
+                await pilot.pause()
+
+                ready_tab_widths = [
+                    tab.region.width for tab in app.screen.query(".step-tab")
+                ]
+                self.assertEqual(ready_tab_widths, [expected_tab_width] * 5)
 
     async def test_completes_output_input_camera_and_summary_flow(self) -> None:
         recording = AudioRecording(
