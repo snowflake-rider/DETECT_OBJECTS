@@ -9,9 +9,6 @@ import unittest
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SETUP_SCRIPT = PROJECT_ROOT / "bootstrap" / "setup.sh"
 WINDOWS_SETUP_SCRIPT = PROJECT_ROOT / "bootstrap" / "setup.ps1"
-FZF_MENU_SCRIPT = PROJECT_ROOT / "bootstrap" / "menus" / "fzf.sh"
-SIMPLE_MENU_SCRIPT = PROJECT_ROOT / "bootstrap" / "menus" / "simple.sh"
-FZF_INSTALLER = PROJECT_ROOT / "bootstrap" / "tools" / "install_fzf.sh"
 CONDA_MANAGER = PROJECT_ROOT / "bootstrap" / "managers" / "conda.sh"
 MINICONDA_MANAGER = PROJECT_ROOT / "bootstrap" / "managers" / "miniconda.sh"
 
@@ -29,11 +26,14 @@ class SetupSelectorTests(unittest.TestCase):
             text=True,
         )
 
-    def test_help_lists_available_managers(self) -> None:
+    def test_help_describes_uv_only_setup(self) -> None:
         result = self.run_setup("--help")
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("[uv|conda]", result.stdout)
+        self.assertIn("[uv]", result.stdout)
+        self.assertIn("Conda status:", result.stdout)
+        self.assertIn("uv workflow is verified and working reliably", result.stdout)
+        self.assertIn("while Conda support is reviewed", result.stdout)
         self.assertIn("Portability:", result.stdout)
         self.assertIn("Consistency:", result.stdout)
         self.assertIn("Isolation:", result.stdout)
@@ -45,42 +45,29 @@ class SetupSelectorTests(unittest.TestCase):
         result = self.run_setup("unknown")
 
         self.assertEqual(result.returncode, 2)
-        self.assertIn("Choose uv or conda", result.stderr)
+        self.assertIn("Only uv is currently supported", result.stderr)
+
+    def test_conda_is_disabled(self) -> None:
+        result = self.run_setup("conda")
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("Conda setup is temporarily disabled", result.stderr)
+        self.assertIn("uv workflow is verified and working reliably", result.stderr)
+        self.assertIn("while Conda support is reviewed", result.stderr)
 
     def test_miniconda_is_not_a_separate_manager_choice(self) -> None:
         result = self.run_setup("miniconda")
 
         self.assertEqual(result.returncode, 2)
-        self.assertIn("Choose uv or conda", result.stderr)
+        self.assertIn("Only uv is currently supported", result.stderr)
 
-    def test_noninteractive_run_requires_explicit_manager(self) -> None:
-        result = self.run_setup()
-
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("Choose directly", result.stderr)
-
-    def test_unix_menu_uses_optional_fzf_with_simple_fallback(self) -> None:
+    def test_unix_entrypoint_defaults_to_uv_without_a_menu(self) -> None:
         setup = SETUP_SCRIPT.read_text(encoding="utf-8")
-        fzf_menu = FZF_MENU_SCRIPT.read_text(encoding="utf-8")
-        simple_menu = SIMPLE_MENU_SCRIPT.read_text(encoding="utf-8")
-        installer = FZF_INSTALLER.read_text(encoding="utf-8")
 
-        self.assertIn("fzf is not installed. Install it locally?", setup)
-        self.assertIn('menus/fzf.sh', setup)
-        self.assertIn('menus/simple.sh', setup)
-        self.assertIn('install_project_fzf', installer)
-        self.assertIn('--bin', installer)
-        self.assertIn('fzf_version="0.72.0"', installer)
-        self.assertIn('choose_manager()', fzf_menu)
-        self.assertIn('choose_manager()', simple_menu)
-        self.assertIn("Portability:", fzf_menu)
-        self.assertIn("Consistency:", simple_menu)
-        self.assertIn("uv.lock keeps dependency versions consistent", fzf_menu)
-        self.assertIn("uv manages Python locally", fzf_menu)
-        self.assertIn("uv sync --locked detects dependency changes", fzf_menu)
-        self.assertIn("uv.lock keeps dependency versions consistent", simple_menu)
-        self.assertIn("uv manages Python locally", simple_menu)
-        self.assertIn("uv sync --locked detects dependency changes", simple_menu)
+        self.assertIn('selected_manager="${1:-uv}"', setup)
+        self.assertIn('exec "${bootstrap_dir}/managers/uv.sh"', setup)
+        self.assertNotIn('menus/fzf.sh', setup)
+        self.assertNotIn('menus/simple.sh', setup)
 
     def test_conda_uses_private_miniconda_as_a_fallback(self) -> None:
         conda_manager = CONDA_MANAGER.read_text(encoding="utf-8")

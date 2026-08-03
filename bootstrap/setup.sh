@@ -6,14 +6,11 @@
 set -euo pipefail
 
 # Bash commands used later in this script:
-# | Command    | What it does                                         |
-# | ---------- | ---------------------------------------------------- |
-# | read       | Read keyboard input into a variable                  |
-# | source     | Load another shell file into the current shell       |
-# | echo       | Print a simple line of text                           |
-# | command -v | Find a command and print its location                 |
-# | printf     | Print formatted text with explicit newlines          |
-# | exec       | Replace setup.sh with the selected manager script    |
+# | Command | What it does                                      |
+# | ------- | ------------------------------------------------- |
+# | echo    | Print a simple line of text                        |
+# | printf  | Print formatted text with explicit newlines       |
+# | exec    | Replace setup.sh with the uv manager script       |
 
 # ----- Step 2: Find the bootstrap directory and project root -----
 
@@ -56,41 +53,46 @@ esac
 # Step 5 calls usage only when the user passes -h or --help.
 usage() {
     cat <<EOF
-Usage: $0 [uv|conda]
+Usage: $0 [uv]
 
-With no manager, opens the interactive ODIA environment chooser.
+With no manager, uses uv.
 
-  uv         Locked, repeatable project environment (recommended)
-  conda      Use Conda (installed automatically if missing)
+  uv         Locked, repeatable project environment
 
-Why uv is recommended for this project:
+Why uv is used for this project:
   Portability: The same setup workflow works on macOS, Linux, and Windows.
   Consistency: uv.lock keeps dependency versions consistent across computers.
   Isolation: uv installs Python without relying on the system Python.
   Validation: uv sync --locked detects an outdated lockfile before launch.
+
+Conda status:
+  Temporarily disabled because the uv workflow is verified and working reliably.
+  Setup stays on one known-good environment path while Conda support is reviewed.
 EOF
 }
 
 # ----- Step 5: Read and validate the optional manager argument -----
 
 # $1 is the first argument given to this script, such as "uv".
-# ${1:-} uses $1 when it exists; otherwise, :- supplies an empty default value.
-# This lets the script run without an argument and show the menu instead.
-selected_manager="${1:-}"
+# ${1:-uv} uses $1 when it exists and defaults to uv otherwise.
+selected_manager="${1:-uv}"
 
 case "${selected_manager}" in
-    "")
-        # No argument: the menu will ask the user.
+    uv)
         ;;
-    uv|conda)
-        # The user selected a supported manager.
+    conda)
+        # Keep Conda as an explicit disabled option so the reason is visible to
+        # callers instead of treating it as an unknown manager.
+        echo "Conda setup is temporarily disabled because the uv workflow is verified and working reliably." >&2
+        echo "Use uv while Conda support is reviewed." >&2
+        exit 2
         ;;
     -h|--help)
         usage
         exit 0
         ;;
     *)
-        echo "Choose uv or conda." >&2
+        echo "Only uv is currently supported." >&2
         exit 2
         ;;
 esac
@@ -100,47 +102,10 @@ esac
 # All manager commands run from the repository root.
 cd "${project_root}"
 
-# ----- Step 7: Ask for a manager when none was provided -----
+# ----- Step 7: Run the uv manager script -----
 
-# -z is true when a string has zero characters (it is empty).
-# If no manager was given, selected_manager is empty, so show the menu.
-if [[ -z "${selected_manager}" ]]; then
-    fzf_command="$(command -v fzf || true)"
-    project_fzf="${project_root}/.odia/tools/fzf/bin/fzf"
-
-    # Reuse the project-local fzf when a previous setup installed it.
-    if [[ -z "${fzf_command}" && -x "${project_fzf}" ]]; then
-        fzf_command="${project_fzf}"
-    fi
-
-    # Ask before installing optional menu software.
-    if [[ -z "${fzf_command}" && -t 0 ]]; then
-        read -r -p "fzf is not installed. Install it locally? [y/N] " install_fzf_choice
-
-        if [[ "${install_fzf_choice}" == "y" || "${install_fzf_choice}" == "Y" ]]; then
-            source "${bootstrap_dir}/tools/install_fzf.sh"
-
-            if ! install_project_fzf; then
-                echo "fzf installation failed; using the simple menu." >&2
-                fzf_command=""
-            fi
-        fi
-    fi
-
-    if [[ -n "${fzf_command}" ]]; then
-        source "${bootstrap_dir}/menus/fzf.sh"
-    else
-        source "${bootstrap_dir}/menus/simple.sh"
-    fi
-
-    choose_manager
-fi
-
-# ----- Step 8: Run the selected manager script -----
-
-# The selected manager prepares its environment and starts ODIA.
-manager_script="${bootstrap_dir}/managers/${selected_manager}.sh"
+# uv prepares its project-local environment and starts ODIA.
 printf '\nPlatform: %s\n' "${platform_name}"
-printf 'Selected: %s\n' "${selected_manager}"
+printf 'Selected: uv\n'
 printf 'Preparing the project-local environment…\n\n'
-exec "${manager_script}"
+exec "${bootstrap_dir}/managers/uv.sh"

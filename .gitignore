@@ -94,5 +94,10 @@ temp/
 
 # Jupyter runtime and exported notebook output
 .ipynb_checkpoints/
-notebooks/sound_models/*.html
-notebooks/sound_models/*.pdf
+notebooks/
+
+# Local DOOM prototype
+doom_yolo_prototype/
+
+# Local Codex work artifacts
+.codex*
