@@ -13,10 +13,6 @@ Project-wide documentation is grouped here by purpose.
 
 - [Learn the ODIA architecture](learning/odia-architecture/README.md)
 
-## Audio research
-
-- [Audio source separation](research/audio.md)
-
 ## Reviews
 
 - [Python arguments and methods](reviews/python_arguments_and_methods.md)
@@ -37,7 +33,6 @@ Project-wide documentation is grouped here by purpose.
 ## Executable research
 
 - The multimodal pipeline prototype is under `prototypes/`.
-- The SAM-Audio source-separation prototype is under `prototypes/audio/`.
 - Sound-model notebooks are under `notebooks/sound_models/`.
 
 Context-specific documentation remains beside the files it explains, including

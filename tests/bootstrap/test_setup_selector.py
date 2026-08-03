@@ -115,34 +115,16 @@ class SetupSelectorTests(unittest.TestCase):
         self.assertIn("sync --locked --no-dev", manager)
         self.assertIn("run --no-dev odia", manager)
 
-    def test_mandatory_desktop_and_optional_audio_dependencies(self) -> None:
+    def test_mandatory_desktop_dependencies(self) -> None:
         with (PROJECT_ROOT / "pyproject.toml").open("rb") as project_file:
             project = tomllib.load(project_file)
 
         base_dependencies = project["project"]["dependencies"]
-        optional_dependencies = project["project"]["optional-dependencies"]
-
         self.assertIn("PySide6==6.11.1", base_dependencies)
         self.assertNotIn("pandas>=3.0.5", base_dependencies)
-        self.assertNotIn("desktop", optional_dependencies)
-        self.assertNotIn("apple-audio", optional_dependencies)
-        self.assertTrue(
-            any(
-                dependency.startswith("mlx-audio==")
-                for dependency in optional_dependencies["mlx-audio"]
-            )
-        )
-        self.assertFalse(
-            any(
-                "soundanalysis" in dependency.lower()
-                for dependencies in optional_dependencies.values()
-                for dependency in dependencies
-            )
-        )
+        self.assertNotIn("optional-dependencies", project["project"])
 
         self.assertIn("PySide6", REQUIRED_MODULES)
-        self.assertNotIn("mlx_audio", REQUIRED_MODULES)
-        self.assertNotIn("SoundAnalysis", REQUIRED_MODULES)
 
     def test_conda_uses_private_miniconda_as_a_fallback(self) -> None:
         conda_manager = CONDA_MANAGER.read_text(encoding="utf-8")

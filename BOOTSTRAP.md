@@ -111,8 +111,7 @@ Run the same command again whenever you want to start ODIA.
 Setup does not activate the environment in your terminal. It runs ODIA inside
 the selected environment, then leaves your terminal unchanged when ODIA closes.
 
-## Optional dependency sets
+## Development dependency group
 
-The SAM-Audio separation prototype is available through the `mlx-audio` extra.
 Notebook and formatting tools live in the `dev` dependency group. PySide6 is
 part of the mandatory base runtime.

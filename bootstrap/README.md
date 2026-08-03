@@ -70,14 +70,13 @@ Rerun setup to update the environment:
 With uv, add or remove dependencies using `.odia/tools/bin/uv add PACKAGE` or
 `.odia/tools/bin/uv remove PACKAGE`.
 
-## Optional features
+## Development tools
 
 The base dependency set provides YOLO, Whisper, Textual setup, the Classic
-OpenCV runtime, and the required PySide6 Desktop Dashboard. Optional features
-are declared separately:
+OpenCV runtime, and the required PySide6 Desktop Dashboard.
 
-- `mlx-audio`: SAM-Audio source-separation prototype on Apple Silicon
-- `dev`: tests, notebooks, and formatting tools
+Tests, notebooks, and formatting tools are declared in the `dev` dependency
+group.
 
-The standard bootstrap excludes both optional sets so rerunning it produces the
+The standard bootstrap excludes development tools so rerunning it produces the
 same runtime on every supported platform.
