@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 import subprocess
+import tomllib
 import unittest
+
+from bootstrap.tools.verify_environment import REQUIRED_MODULES
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SETUP_SCRIPT = PROJECT_ROOT / "bootstrap" / "setup.sh"
@@ -66,8 +69,35 @@ class SetupSelectorTests(unittest.TestCase):
 
         self.assertIn('selected_manager="${1:-uv}"', setup)
         self.assertIn('exec "${bootstrap_dir}/managers/uv.sh"', setup)
-        self.assertNotIn('menus/fzf.sh', setup)
-        self.assertNotIn('menus/simple.sh', setup)
+        self.assertNotIn("menus/fzf.sh", setup)
+        self.assertNotIn("menus/simple.sh", setup)
+
+        manager = (PROJECT_ROOT / "bootstrap" / "managers" / "uv.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("sync --locked --no-dev", manager)
+        self.assertIn("run --no-dev odia", manager)
+
+    def test_mandatory_desktop_and_optional_audio_dependencies(self) -> None:
+        with (PROJECT_ROOT / "pyproject.toml").open("rb") as project_file:
+            project = tomllib.load(project_file)
+
+        base_dependencies = project["project"]["dependencies"]
+        optional_dependencies = project["project"]["optional-dependencies"]
+
+        self.assertIn("PySide6==6.11.1", base_dependencies)
+        self.assertNotIn("pandas>=3.0.5", base_dependencies)
+        self.assertNotIn("desktop", optional_dependencies)
+        self.assertTrue(
+            any(
+                dependency.startswith("mlx-audio==")
+                for dependency in optional_dependencies["apple-audio"]
+            )
+        )
+
+        self.assertIn("PySide6", REQUIRED_MODULES)
+        self.assertNotIn("mlx_audio", REQUIRED_MODULES)
+        self.assertNotIn("SoundAnalysis", REQUIRED_MODULES)
 
     def test_conda_uses_private_miniconda_as_a_fallback(self) -> None:
         conda_manager = CONDA_MANAGER.read_text(encoding="utf-8")
@@ -94,6 +124,8 @@ class SetupSelectorTests(unittest.TestCase):
         self.assertIn('Join-Path $StateDir "envs\\uv"', script)
         self.assertIn("Invoke-WebRequest", script)
         self.assertIn("Environment ready. Starting ODIA", script)
+        self.assertIn('@("sync", "--locked", "--no-dev")', script)
+        self.assertIn("run --no-dev odia", script)
 
 
 if __name__ == "__main__":

@@ -78,6 +78,10 @@ run the `.ps1` script directly from Git Bash:
 Setup uses `uv` on macOS, Linux, and Windows. Conda setup is temporarily
 disabled while its support is reviewed.
 
+The standard setup installs both the Classic runtime and the required PySide6
+Desktop Dashboard. Apple audio experiments and notebook tools are optional and
+are not added to the runtime environment by default.
+
 ### Why uv is used
 
 For this project, uv provides the most repeatable setup:
@@ -106,3 +110,9 @@ Run the same command again whenever you want to start ODIA.
 
 Setup does not activate the environment in your terminal. It runs ODIA inside
 the selected environment, then leaves your terminal unchanged when ODIA closes.
+
+## Optional dependency sets
+
+Apple SoundAnalysis and MLX-Audio prototype dependencies are available through
+the `apple-audio` extra. Notebook and formatting tools live in the `dev`
+dependency group. PySide6 is part of the mandatory base runtime.

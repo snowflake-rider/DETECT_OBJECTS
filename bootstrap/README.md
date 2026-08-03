@@ -15,8 +15,7 @@ Bootstrap installs Python, packages, and ODIA locally. Generated files stay in
 .\bootstrap\setup.ps1
 ```
 
-Choose **uv** (recommended) or **Conda**. Setup installs Conda automatically
-when it is missing.
+Setup uses **uv**. Conda support is currently disabled.
 
 uv is recommended for four reasons:
 
@@ -25,21 +24,16 @@ uv is recommended for four reasons:
 - **Isolation:** Python and packages stay inside the project.
 - **Validation:** `uv sync --locked` checks the environment before launch.
 
-Setup uses `fzf` for the menu when available. If it is missing, setup asks
-whether to install it under `.odia/tools/fzf`. Declining or a failed installation
-uses the built-in arrow-key menu instead.
-To skip the menu, pass the choice directly:
-
-```bash
-./bootstrap/setup.sh uv
-```
+The default setup installs both the Classic runtime and the PySide6 Desktop
+Dashboard. Development tools and experimental Apple audio packages are not
+installed into the runtime environment.
 
 ## Local state
 
 ```text
 .odia/
 ├── envs/      # Python environments
-├── tools/     # uv, Python, and the private Miniconda fallback
+├── tools/     # uv and its managed Python
 └── caches/    # downloaded packages
 ```
 
@@ -57,7 +51,14 @@ Rerun setup to update the environment:
 With uv, add or remove dependencies using `.odia/tools/bin/uv add PACKAGE` or
 `.odia/tools/bin/uv remove PACKAGE`.
 
-The bootstrap installs PySide6 for the integrated Desktop Dashboard. It is
-declared in both `pyproject.toml` and `requirements.txt`, locked for uv, and
-checked by `bootstrap/tools/verify_environment.py` so the uv and Conda paths
-prepare the same runnable interfaces.
+## Optional features
+
+The base dependency set provides YOLO, Whisper, Textual setup, the Classic
+OpenCV runtime, and the required PySide6 Desktop Dashboard. Optional features
+are declared separately:
+
+- `apple-audio`: Apple SoundAnalysis and MLX-Audio prototypes
+- `dev`: tests, notebooks, and formatting tools
+
+The standard bootstrap excludes both optional sets so rerunning it produces the
+same runtime on every supported platform.

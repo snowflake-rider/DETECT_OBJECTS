@@ -169,17 +169,21 @@ function Start-WithUv {
     $env:UV_CACHE_DIR = Join-Path $StateDir "caches\uv"
 
     Write-Host "Preparing the Python environment..."
-    Invoke-Program $UvCommand @("sync", "--locked")
+    Invoke-Program $UvCommand @("sync", "--locked", "--no-dev")
 
     Write-Host "Downloading required models..."
-    Invoke-Program $UvCommand @("run", "python", "bootstrap/tools/download_models.py")
+    Invoke-Program $UvCommand @(
+        "run", "--no-dev", "python", "bootstrap/tools/download_models.py"
+    )
 
     Write-Host "Verifying the environment..."
-    Invoke-Program $UvCommand @("run", "python", "bootstrap/tools/verify_environment.py")
+    Invoke-Program $UvCommand @(
+        "run", "--no-dev", "python", "bootstrap/tools/verify_environment.py"
+    )
 
     Write-Host
     Write-Host "Environment ready. Starting ODIA..."
-    & $UvCommand run odia
+    & $UvCommand run --no-dev odia
     exit $LASTEXITCODE
 }
 

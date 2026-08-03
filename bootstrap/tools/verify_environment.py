@@ -22,25 +22,6 @@ REQUIRED_MODULES = (
 )
 
 
-# tuple[str, ...] means a tuple containing any number of strings.
-# The ... means the str type may repeat: (), ("cv2",), ("cv2", "torch"), etc.
-def required_modules() -> tuple[str, ...]:
-    """Return base imports plus platform-specific Apple dependencies."""
-    # Convert the fixed tuple to a list so platform-specific names can be added.
-    modules = list(REQUIRED_MODULES)
-
-    # macOS needs Apple frameworks for audio and device integration.
-    if platform.system() == "Darwin":
-        modules.extend(("AVFoundation", "SoundAnalysis"))
-
-        # Apple Silicon also uses the MLX audio package.
-        if platform.machine() == "arm64":
-            modules.append("mlx_audio")
-
-    # Convert the completed list back to an immutable tuple.
-    return tuple(modules)
-
-
 def main() -> int:
     """Print verification failures and return a shell-friendly status code."""
     # Store every problem so the user can fix them together instead of running
@@ -57,7 +38,7 @@ def main() -> int:
     # missing, without importing and running the target module itself.
     missing_modules = [
         module
-        for module in required_modules()
+        for module in REQUIRED_MODULES
         if importlib.util.find_spec(module) is None
     ]
     if missing_modules:

@@ -164,9 +164,9 @@ Desktop은 현재 **Preview**로 표시되는 GUI 실행 방식이다. Classic�
 
 인터페이스 구조는 역할별로 분리되어 있지만 다음 사항은 정리가 필요하다.
 
-- `PySide6==6.11.1`을 `pyproject.toml`, `requirements.txt`, `uv.lock`과
-  Bootstrap 환경 검증에 포함했다. 따라서 uv와 Conda 경로 모두 깨끗한 환경에서
-  Desktop 모드에 필요한 GUI 런타임을 준비한다.
+- `PySide6==6.11.1`은 `pyproject.toml`, `requirements.txt`, `uv.lock`과
+  Bootstrap 환경 검증에 포함한 필수 런타임이다. 기본 설치에서 Classic과
+  Desktop 모드를 모두 사용할 수 있다.
 - 루트 `BOOTSTRAP.md`는 fzf를 먼저 직접 설치하도록 안내하지만 실제
   `setup.sh`에는 프로젝트 로컬 설치와 기본 메뉴 폴백이 이미 있다. 사용자 문서의
   설명을 실제 동작에 맞출 필요가 있다.

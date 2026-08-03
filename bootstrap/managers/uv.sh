@@ -80,23 +80,24 @@ export UV_PYTHON_INSTALL_DIR="${uv_python_install_dir}"
 # start of the line, Bash executes it as a command. These are real commands,
 # not descriptions or dry runs.
 
-# sync creates or updates the Python environment from uv.lock.
+# sync creates or updates the core Python environment from uv.lock.
 # --locked refuses to change uv.lock and fails when it is out of date.
+# --no-dev keeps notebook and development tools out of the runtime environment.
 echo "Preparing the Python environment..."
-"${uv_command}" sync --locked
+"${uv_command}" sync --locked --no-dev
 
 # uv run starts a command inside the prepared uv environment.
 # This runs download_models.py, which downloads missing YOLO model files.
 echo "Downloading required models..."
-"${uv_command}" run python bootstrap/tools/download_models.py
+"${uv_command}" run --no-dev python bootstrap/tools/download_models.py
 
 # This runs verify_environment.py inside the same environment. It checks
 # Python 3.11, required imports, configuration, models, and sample files.
 echo "Verifying the environment..."
-"${uv_command}" run python bootstrap/tools/verify_environment.py
+"${uv_command}" run --no-dev python bootstrap/tools/verify_environment.py
 
 echo
 echo "Environment ready. Starting ODIA..."
 
 # exec replaces this setup process with the ODIA process.
-exec "${uv_command}" run odia
+exec "${uv_command}" run --no-dev odia
