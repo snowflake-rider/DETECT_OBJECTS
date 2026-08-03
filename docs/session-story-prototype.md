@@ -27,3 +27,13 @@ story.json
 Codex runs ephemerally with a read-only sandbox. Story generation requires at
 least one matching snapshot and uses the account already authenticated by the
 local Codex CLI.
+
+If ODIA and Codex run on different machines, launch ODIA with an SSH target:
+
+```bash
+./bootstrap/setup.sh uv --codex-ssh codex-mac
+```
+
+Setup checks key-based SSH access and the remote Codex login. Story artifacts
+are streamed to a temporary remote directory for that request and removed when
+the remote command exits.

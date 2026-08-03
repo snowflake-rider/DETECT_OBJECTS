@@ -14,7 +14,13 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QImage
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QLabel, QLineEdit, QPushButton
+from PySide6.QtWidgets import (
+    QApplication,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QPushButton,
+)
 
 from detect_objects.desktop.fake_video import FakeVideoStream
 from detect_objects.desktop.runtime_window import RuntimeWindow
@@ -108,6 +114,60 @@ class StoryIntegrationTests(unittest.TestCase):
             )
             self.assertFalse(window.findChild(QLabel, "story-image").pixmap().isNull())
             self.assertTrue(story_button.isEnabled())
+
+    def test_user_can_open_a_detected_snapshot_in_the_right_sidebar(self) -> None:
+        captured_at = datetime(2026, 8, 3, 15, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            recorder = SessionRecorder(
+                Path(temporary_directory),
+                session_id="snapshot-gallery-demo",
+                now=lambda: captured_at,
+            )
+            window = RuntimeWindow(
+                video_stream=FakeVideoStream(),
+                session_recorder=recorder,
+            )
+            window.show()
+            self.addCleanup(window.close)
+            self.application.processEvents()
+
+            command_input = window.findChild(QLineEdit, "command-input")
+            command_input.setText("사람을 찾아줘")
+            QTest.mouseClick(
+                window.findChild(QPushButton, "send-command"),
+                Qt.MouseButton.LeftButton,
+            )
+
+            image = QImage(16, 12, QImage.Format.Format_RGB32)
+            image.fill(QColor("#245c82"))
+            window.video_stream.detection_frame_ready.emit(
+                image,
+                [
+                    Detection(
+                        bounds=(0, 0, 15, 11),
+                        class_name="person",
+                        confidence=0.94,
+                    )
+                ],
+            )
+            self.application.processEvents()
+
+            gallery = window.findChild(QListWidget, "snapshot-gallery")
+            self.assertEqual(gallery.count(), 1)
+            self.assertIn("PERSON", gallery.item(0).text())
+
+            QTest.mouseClick(
+                gallery.viewport(),
+                Qt.MouseButton.LeftButton,
+                pos=gallery.visualItemRect(gallery.item(0)).center(),
+            )
+            self.application.processEvents()
+
+            preview = window.findChild(QLabel, "snapshot-preview")
+            details = window.findChild(QLabel, "snapshot-details")
+            self.assertFalse(preview.pixmap().isNull())
+            self.assertIn("PERSON 94%", details.text())
+            self.assertIn("2026-08-03 15:00:00 UTC", details.text())
 
 
 if __name__ == "__main__":

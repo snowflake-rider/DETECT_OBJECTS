@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QTimer, Signal, Slot
-from PySide6.QtGui import QCloseEvent, QImage, QPixmap, QResizeEvent
+from datetime import datetime, timezone
+
+from PySide6.QtCore import QSize, Qt, QTimer, Signal, Slot
+from PySide6.QtGui import QCloseEvent, QIcon, QImage, QPixmap, QResizeEvent
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListView,
+    QListWidget,
+    QListWidgetItem,
     QMainWindow,
     QPushButton,
     QSizePolicy,
@@ -19,8 +24,8 @@ from PySide6.QtWidgets import (
 from ..device_setup.context import Context
 from ..models.catalog import get_model_option
 from ..paths import PROJECT_ROOT
-from ..story.generator import CodexStoryGenerator, StoryGenerator, StoryResult
-from ..story.session import SessionRecorder
+from ..story.generator import StoryGenerator, StoryResult, create_story_generator
+from ..story.session import SessionRecorder, SnapshotEvent
 from ..story.worker import StoryWorker
 from ..voice_text_convert.parse_and_match_module import Text_Manager
 from .camera_video import CameraVideoStream
@@ -51,7 +56,7 @@ class RuntimeWindow(QMainWindow):
         self._session_recorder = session_recorder or SessionRecorder(
             PROJECT_ROOT / "outputs" / "story_sessions"
         )
-        self._story_generator = story_generator or CodexStoryGenerator()
+        self._story_generator = story_generator or create_story_generator()
         self._story_worker: StoryWorker | None = None
         self._text_manager_context = Text_Manager()
         self._text_manager = self._text_manager_context.__enter__()
@@ -116,10 +121,55 @@ class RuntimeWindow(QMainWindow):
         page.setContentsMargins(16, 14, 16, 14)
         page.setSpacing(12)
         page.addWidget(self._build_top_rail())
-        page.addWidget(self._build_video_panel(), stretch=1)
-        page.addWidget(self._build_command_dock())
+
+        body = QHBoxLayout()
+        body.setSpacing(12)
+        main_column = QVBoxLayout()
+        main_column.setSpacing(12)
+        main_column.addWidget(self._build_video_panel(), stretch=1)
+        main_column.addWidget(self._build_command_dock())
+        body.addLayout(main_column, stretch=1)
+        body.addWidget(self._build_snapshot_sidebar())
+        page.addLayout(body, stretch=1)
 
         return content
+
+    def _build_snapshot_sidebar(self) -> QFrame:
+        sidebar = QFrame()
+        sidebar.setObjectName("snapshot-sidebar")
+        sidebar.setMinimumWidth(260)
+        sidebar.setMaximumWidth(320)
+        layout = QVBoxLayout(sidebar)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+
+        heading = QLabel("SESSION SNAPSHOTS")
+        heading.setObjectName("status-heading")
+        layout.addWidget(heading)
+
+        preview = QLabel("Click a detected snapshot to inspect it")
+        preview.setObjectName("snapshot-preview")
+        preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        preview.setMinimumHeight(170)
+        preview.setWordWrap(True)
+        layout.addWidget(preview)
+
+        details = QLabel("No snapshot selected")
+        details.setObjectName("snapshot-details")
+        details.setWordWrap(True)
+        layout.addWidget(details)
+
+        gallery = QListWidget()
+        gallery.setObjectName("snapshot-gallery")
+        gallery.setViewMode(QListView.ViewMode.IconMode)
+        gallery.setResizeMode(QListView.ResizeMode.Adjust)
+        gallery.setMovement(QListView.Movement.Static)
+        gallery.setIconSize(QSize(104, 64))
+        gallery.setSpacing(6)
+        gallery.setWordWrap(True)
+        gallery.itemClicked.connect(self._show_snapshot)
+        layout.addWidget(gallery, stretch=1)
+        return sidebar
 
     def _build_top_rail(self) -> QFrame:
         rail = QFrame()
@@ -488,11 +538,52 @@ class RuntimeWindow(QMainWindow):
     def record_story_frame(self, image: QImage, detections: object) -> None:
         """Save a detection frame when it matches the latest instruction."""
         try:
-            self._session_recorder.record_detection(image, detections)
+            event = self._session_recorder.record_detection(image, detections)
         except (OSError, TypeError, ValueError) as error:
             self.findChild(QLabel, "story-output").setText(
                 f"Could not save snapshot: {error}"
             )
+            return
+
+        if event is not None:
+            self._add_snapshot(event)
+
+    def _add_snapshot(self, event: SnapshotEvent) -> None:
+        snapshot_path = self._session_recorder.session_dir / event.snapshot
+        object_summary = " · ".join(
+            f"{found.class_name.upper()} {found.confidence:.0%}"
+            for found in event.objects
+        )
+        captured_at = datetime.fromisoformat(event.timestamp).astimezone(timezone.utc)
+        details = f"{object_summary}\n{captured_at:%Y-%m-%d %H:%M:%S UTC}"
+
+        thumbnail = QPixmap(str(snapshot_path)).scaled(
+            QSize(104, 64),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        item = QListWidgetItem(QIcon(thumbnail), object_summary)
+        item.setData(Qt.ItemDataRole.UserRole, str(snapshot_path))
+        item.setData(Qt.ItemDataRole.UserRole + 1, details)
+        item.setToolTip(details)
+        self.findChild(QListWidget, "snapshot-gallery").addItem(item)
+
+    @Slot(object)
+    def _show_snapshot(self, item: QListWidgetItem) -> None:
+        snapshot_path = item.data(Qt.ItemDataRole.UserRole)
+        preview = self.findChild(QLabel, "snapshot-preview")
+        pixmap = QPixmap(snapshot_path)
+        preview.setText("")
+        preview.setPixmap(
+            pixmap.scaled(
+                preview.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        )
+        self.findChild(QLabel, "snapshot-details").setText(
+            item.data(Qt.ItemDataRole.UserRole + 1)
+        )
 
     def _generate_story(self) -> None:
         story_output = self.findChild(QLabel, "story-output")
@@ -650,6 +741,11 @@ class RuntimeWindow(QMainWindow):
             border: 1px solid #272c34;
             border-radius: 8px;
         }
+        QFrame#snapshot-sidebar {
+            background: #111419;
+            border: 1px solid #272c34;
+            border-radius: 8px;
+        }
         QFrame#status-card {
             background: #171b21;
             border: 1px solid #2c323b;
@@ -748,6 +844,35 @@ class RuntimeWindow(QMainWindow):
         QLabel#story-output {
             color: #c9cfda;
             font-style: italic;
+        }
+        QLabel#snapshot-preview {
+            background: #050608;
+            border: 1px solid #343a44;
+            border-radius: 6px;
+            color: #747e8d;
+            padding: 6px;
+        }
+        QLabel#snapshot-details {
+            color: #c9cfda;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        QListWidget#snapshot-gallery {
+            background: #090b0e;
+            border: 1px solid #343a44;
+            border-radius: 6px;
+            color: #c9cfda;
+            outline: none;
+        }
+        QListWidget#snapshot-gallery::item {
+            border: 1px solid transparent;
+            border-radius: 5px;
+            padding: 5px;
+        }
+        QListWidget#snapshot-gallery::item:selected {
+            background: #302653;
+            border-color: #8265d6;
+            color: #ffffff;
         }
         QLineEdit {
             background: #090b0e;

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import subprocess
+import tempfile
 import tomllib
 import unittest
 
@@ -20,6 +22,7 @@ class SetupSelectorTests(unittest.TestCase):
     def run_setup(
         self,
         *arguments: str,
+        environment: dict[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             ["bash", str(SETUP_SCRIPT), *arguments],
@@ -27,6 +30,7 @@ class SetupSelectorTests(unittest.TestCase):
             check=False,
             capture_output=True,
             text=True,
+            env=environment,
         )
 
     def test_help_describes_uv_only_setup(self) -> None:
@@ -43,12 +47,44 @@ class SetupSelectorTests(unittest.TestCase):
         self.assertIn("Validation:", result.stdout)
         self.assertIn("uv.lock keeps dependency versions consistent", result.stdout)
         self.assertIn("uv sync --locked detects an outdated lockfile", result.stdout)
+        self.assertIn("--codex-ssh SSH_TARGET", result.stdout)
+        self.assertIn("runs Codex on another machine over SSH", result.stdout)
 
     def test_invalid_manager_returns_usage_error(self) -> None:
         result = self.run_setup("unknown")
 
         self.assertEqual(result.returncode, 2)
         self.assertIn("Only uv is currently supported", result.stderr)
+
+    def test_codex_ssh_requires_a_target(self) -> None:
+        result = self.run_setup("--codex-ssh")
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("--codex-ssh requires an SSH target", result.stderr)
+
+    def test_codex_ssh_connection_is_checked_before_environment_setup(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            fake_bin = Path(temporary_directory)
+            fake_ssh = fake_bin / "ssh"
+            fake_ssh.write_text(
+                "#!/bin/sh\nprintf 'simulated ssh failure\\n' >&2\nexit 255\n",
+                encoding="utf-8",
+            )
+            fake_ssh.chmod(0o755)
+            environment = os.environ.copy()
+            environment["PATH"] = f"{fake_bin}{os.pathsep}{environment['PATH']}"
+
+            result = self.run_setup(
+                "--codex-ssh",
+                "codex-mac",
+                environment=environment,
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            "Could not connect to Codex SSH target 'codex-mac'",
+            result.stderr,
+        )
 
     def test_conda_is_disabled(self) -> None:
         result = self.run_setup("conda")
@@ -67,7 +103,8 @@ class SetupSelectorTests(unittest.TestCase):
     def test_unix_entrypoint_defaults_to_uv_without_a_menu(self) -> None:
         setup = SETUP_SCRIPT.read_text(encoding="utf-8")
 
-        self.assertIn('selected_manager="${1:-uv}"', setup)
+        self.assertIn('selected_manager="uv"', setup)
+        self.assertIn("--codex-ssh)", setup)
         self.assertIn('exec "${bootstrap_dir}/managers/uv.sh"', setup)
         self.assertNotIn("menus/fzf.sh", setup)
         self.assertNotIn("menus/simple.sh", setup)

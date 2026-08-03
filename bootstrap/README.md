@@ -17,6 +17,25 @@ Bootstrap installs Python, packages, and ODIA locally. Generated files stay in
 
 Setup uses **uv**. Conda support is currently disabled.
 
+### Use Codex on another machine
+
+When ODIA runs on a machine without Codex, setup can use an SSH host where the
+Codex CLI is installed and authenticated:
+
+```bash
+./bootstrap/setup.sh uv --codex-ssh codex-mac
+```
+
+`codex-mac` may be an SSH config alias or `user@host`. The project machine must
+be able to connect with key authentication, and Remote Login must be enabled on
+the Codex host. Setup verifies both the remote executable and `codex login
+status` before starting ODIA.
+
+For each Story request, ODIA streams `events.json`, snapshots, the prompt, and
+the output schema into a temporary directory on the Codex host. Codex runs
+ephemerally with a read-only sandbox; the remote temporary directory is removed
+after the JSON result returns. No shared filesystem is required.
+
 uv is recommended for four reasons:
 
 - **Portability:** The same workflow works across supported operating systems.
