@@ -22,18 +22,6 @@ class YoloWorldConfig:
 
 
 @dataclass(frozen=True)
-class AppleSoundAnalysisConfig:
-    """Validated settings for Apple's built-in sound classifier."""
-
-    backend: str
-    classifier_version: int
-    window_seconds: float
-    overlap: float
-    top_k: int
-    thresholds: Mapping[str, float]
-
-
-@dataclass(frozen=True)
 class SamAudioMlxConfig:
     """Validated settings for prompt-guided SAM-Audio separation."""
 
@@ -151,75 +139,6 @@ def load_yolo_world_config(
         weights=weights,
         confidence=float(confidence_value),
         image_size=(image_size_value[0], image_size_value[1]),
-    )
-
-
-def load_apple_sound_analysis_config(
-    config_path: str | Path = DEFAULT_MODELS_CONFIG_PATH,
-) -> AppleSoundAnalysisConfig:
-    """Load and validate the native macOS sound-classifier settings."""
-    _, document = _load_document(config_path)
-
-    try:
-        section = document["audio"]["sound_classifier"]
-    except (KeyError, TypeError) as error:
-        raise ValueError(
-            "Model configuration requires an [audio.sound_classifier] section"
-        ) from error
-
-    if not isinstance(section, dict):
-        raise ValueError("[audio.sound_classifier] must be a TOML table")
-
-    backend = section.get("backend")
-    if backend != "apple_soundanalysis":
-        raise ValueError("audio.sound_classifier.backend must be 'apple_soundanalysis'")
-
-    classifier_version = section.get("classifier_version")
-    if isinstance(classifier_version, bool) or classifier_version != 1:
-        raise ValueError("audio.sound_classifier.classifier_version must be 1")
-
-    window_seconds = _number_in_range(
-        section.get("window_seconds"),
-        name="audio.sound_classifier.window_seconds",
-        minimum=0.5,
-        maximum=15.0,
-    )
-    overlap = _number_in_range(
-        section.get("overlap"),
-        name="audio.sound_classifier.overlap",
-        minimum=0.0,
-        maximum=1.0,
-        maximum_inclusive=False,
-    )
-
-    top_k = section.get("top_k")
-    if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k <= 0:
-        raise ValueError("audio.sound_classifier.top_k must be a positive integer")
-
-    thresholds_value = section.get("thresholds")
-    if not isinstance(thresholds_value, dict) or not thresholds_value:
-        raise ValueError(
-            "audio.sound_classifier.thresholds must contain at least one sound"
-        )
-
-    thresholds: dict[str, float] = {}
-    for label, threshold in thresholds_value.items():
-        if not isinstance(label, str) or not label.strip():
-            raise ValueError("sound threshold labels must be non-empty strings")
-        thresholds[label] = _number_in_range(
-            threshold,
-            name=f"audio.sound_classifier.thresholds.{label}",
-            minimum=0.0,
-            maximum=1.0,
-        )
-
-    return AppleSoundAnalysisConfig(
-        backend=backend,
-        classifier_version=classifier_version,
-        window_seconds=window_seconds,
-        overlap=overlap,
-        top_k=top_k,
-        thresholds=thresholds,
     )
 
 

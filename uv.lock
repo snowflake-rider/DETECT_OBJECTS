@@ -429,10 +429,8 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-apple-audio = [
+mlx-audio = [
     { name = "mlx-audio", marker = "platform_machine == 'arm64' and sys_platform == 'darwin'" },
-    { name = "pyobjc-framework-avfoundation", marker = "sys_platform == 'darwin'" },
-    { name = "pyobjc-framework-soundanalysis", marker = "sys_platform == 'darwin'" },
 ]
 
 [package.dev-dependencies]
@@ -448,12 +446,10 @@ dev = [
 requires-dist = [
     { name = "clip", git = "https://github.com/ultralytics/CLIP.git" },
     { name = "cv2-enumerate-cameras", specifier = ">=1.3.3" },
-    { name = "mlx-audio", marker = "platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'apple-audio'", specifier = "==0.4.6" },
+    { name = "mlx-audio", marker = "platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'mlx-audio'", specifier = "==0.4.6" },
     { name = "numpy", specifier = ">=2.4.6" },
     { name = "openai-whisper", specifier = "==20250625" },
     { name = "opencv-python", specifier = "==5.0.0.93" },
-    { name = "pyobjc-framework-avfoundation", marker = "sys_platform == 'darwin' and extra == 'apple-audio'" },
-    { name = "pyobjc-framework-soundanalysis", marker = "sys_platform == 'darwin' and extra == 'apple-audio'" },
     { name = "pyside6", specifier = "==6.11.1" },
     { name = "sounddevice", specifier = "==0.5.5" },
     { name = "soundfile", specifier = "==0.13.1" },
@@ -462,7 +458,7 @@ requires-dist = [
     { name = "torchvision", specifier = "==0.28.0" },
     { name = "ultralytics", specifier = "==8.4.107" },
 ]
-provides-extras = ["apple-audio"]
+provides-extras = ["mlx-audio"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1806,19 +1802,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/3b/f6/2a8b84dbf1fe7c04dd96ea73d991678d4e09a909f51971ecc51629bb2ab4/pyobjc_framework_quartz-12.2.1.tar.gz", hash = "sha256:b3b8b6f71e66147f8ff9e6213864cc8527e3a0b1ee90835b93ce221f4802d9b0", size = 3215521, upload-time = "2026-06-19T16:21:30.199Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b9/08/527d1ff856e2f2446b5887be01989cc08f9adaf3de7d4eb13d07826c362f/pyobjc_framework_quartz-12.2.1-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:60f29408b4f9ed5391a29c6b63e2aa56ddfb8b66b3fb47962930427981e14462", size = 217998, upload-time = "2026-06-19T16:16:02.978Z" },
-]
-
-[[package]]
-name = "pyobjc-framework-soundanalysis"
-version = "12.2.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pyobjc-core" },
-    { name = "pyobjc-framework-cocoa" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/db/43/b6a1644c01010c50dd4a69b0e4ed144139d60d7900edae937486c62af73b/pyobjc_framework_soundanalysis-12.2.1.tar.gz", hash = "sha256:d17bdea63c2b910c2046ba43383b29b82d594a37feee4431d45b55adc08a3882", size = 15777, upload-time = "2026-06-19T16:21:47.973Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ba/16/2e8f86936aea345432c6d0d080513dc53eac417f4a485d9b8ffb2d5db885/pyobjc_framework_soundanalysis-12.2.1-py2.py3-none-any.whl", hash = "sha256:4385f492320a304bf64ca772e4a5b29d796f0fc160ff764ed060ac1456aa3cdc", size = 4244, upload-time = "2026-06-19T16:17:59.484Z" },
 ]
 
 [[package]]

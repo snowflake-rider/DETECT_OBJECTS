@@ -125,10 +125,18 @@ class SetupSelectorTests(unittest.TestCase):
         self.assertIn("PySide6==6.11.1", base_dependencies)
         self.assertNotIn("pandas>=3.0.5", base_dependencies)
         self.assertNotIn("desktop", optional_dependencies)
+        self.assertNotIn("apple-audio", optional_dependencies)
         self.assertTrue(
             any(
                 dependency.startswith("mlx-audio==")
-                for dependency in optional_dependencies["apple-audio"]
+                for dependency in optional_dependencies["mlx-audio"]
+            )
+        )
+        self.assertFalse(
+            any(
+                "soundanalysis" in dependency.lower()
+                for dependencies in optional_dependencies.values()
+                for dependency in dependencies
             )
         )
 

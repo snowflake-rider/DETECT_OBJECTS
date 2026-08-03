@@ -24,10 +24,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-apple-audio = [
+mlx-audio = [
     "mlx-audio==0.4.6; sys_platform == 'darwin' and platform_machine == 'arm64'",
-    "pyobjc-framework-avfoundation; sys_platform == 'darwin'",
-    "pyobjc-framework-soundanalysis; sys_platform == 'darwin'",
 ]
 
 [project.scripts]

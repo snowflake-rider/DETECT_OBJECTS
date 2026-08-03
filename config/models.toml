@@ -3,20 +3,6 @@ weights = "../model_artifacts/vision/yolov8s-worldv2.pt"
 confidence = 0.65
 image_size = [640, 640]
 
-[audio.sound_classifier]
-backend = "apple_soundanalysis"
-classifier_version = 1
-window_seconds = 3.0
-overlap = 0.5
-top_k = 5
-
-[audio.sound_classifier.thresholds]
-cat_meow = 0.5
-dog_bark = 0.5
-engine = 0.5
-engine_accelerating_revving = 0.5
-race_car = 0.5
-
 [audio.source_separator]
 backend = "sam_audio_mlx"
 model_id = "mlx-community/sam-audio-small-fp16"

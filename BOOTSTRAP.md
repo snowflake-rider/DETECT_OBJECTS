@@ -113,6 +113,6 @@ the selected environment, then leaves your terminal unchanged when ODIA closes.
 
 ## Optional dependency sets
 
-Apple SoundAnalysis and MLX-Audio prototype dependencies are available through
-the `apple-audio` extra. Notebook and formatting tools live in the `dev`
-dependency group. PySide6 is part of the mandatory base runtime.
+The SAM-Audio separation prototype is available through the `mlx-audio` extra.
+Notebook and formatting tools live in the `dev` dependency group. PySide6 is
+part of the mandatory base runtime.

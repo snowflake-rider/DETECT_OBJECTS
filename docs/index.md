@@ -15,7 +15,7 @@ Project-wide documentation is grouped here by purpose.
 
 ## Audio research
 
-- [Audio detection and separation](research/audio.md)
+- [Audio source separation](research/audio.md)
 
 ## Reviews
 
@@ -37,10 +37,9 @@ Project-wide documentation is grouped here by purpose.
 ## Executable research
 
 - The multimodal pipeline prototype is under `prototypes/`.
-- Audio-classification and source-separation prototypes are under
-  `prototypes/audio/`.
+- The SAM-Audio source-separation prototype is under `prototypes/audio/`.
 - Sound-model notebooks are under `notebooks/sound_models/`.
 
 Context-specific documentation remains beside the files it explains, including
-sample-audio attribution, archived refactor notes, model-artifact documentation,
-and the Python learning lab.
+archived refactor notes, model-artifact documentation, and the Python learning
+lab.

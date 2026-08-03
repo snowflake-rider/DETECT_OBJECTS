@@ -76,7 +76,7 @@ The base dependency set provides YOLO, Whisper, Textual setup, the Classic
 OpenCV runtime, and the required PySide6 Desktop Dashboard. Optional features
 are declared separately:
 
-- `apple-audio`: Apple SoundAnalysis and MLX-Audio prototypes
+- `mlx-audio`: SAM-Audio source-separation prototype on Apple Silicon
 - `dev`: tests, notebooks, and formatting tools
 
 The standard bootstrap excludes both optional sets so rerunning it produces the
