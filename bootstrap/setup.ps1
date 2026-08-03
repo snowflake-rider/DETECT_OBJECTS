@@ -1,10 +1,11 @@
 [CmdletBinding()]
 param(
-    # The first optional argument can skip the menu:
+    # The first optional argument selects uv directly:
     #   .\bootstrap\setup.ps1 uv
+    # Conda remains accepted only so callers receive a clear disabled message.
     [Parameter(Position = 0)]
     [ValidateSet("uv", "conda")]
-    [string]$Manager
+    [string]$Manager = "uv"
 )
 
 # Stop when a command or PowerShell operation fails.
@@ -31,79 +32,6 @@ function Invoke-Program {
     & $FilePath @Arguments
     if ($LASTEXITCODE -ne 0) {
         throw "Command failed: $FilePath $($Arguments -join ' ')"
-    }
-}
-
-# Let the user choose with arrow keys, Enter, or number shortcuts.
-function Choose-Manager {
-    if ([Console]::IsInputRedirected) {
-        throw "Cannot open the menu. Choose directly: .\bootstrap\setup.ps1 uv"
-    }
-
-    $Options = @("uv", "conda")
-    $Labels = @(
-        "⚡️ uv          Locked and portable (recommended)",
-        "🐍 Conda       Installed automatically if missing"
-    )
-    $SelectedIndex = 0
-    $Escape = [char]27
-
-    # Use a temporary screen while the menu is open.
-    Write-Host "${Escape}[?1049h" -NoNewline
-
-    try {
-        while ($true) {
-            # Clear the temporary screen and move the cursor to the top.
-            Write-Host "${Escape}[2J${Escape}[H" -NoNewline
-            Write-Host "🛠️  ODIA setup (Windows)"
-            Write-Host
-            Write-Host "Why uv is recommended:"
-            Write-Host "Portability: The same workflow works across supported operating systems."
-            Write-Host "Consistency: uv.lock keeps dependency versions consistent across computers."
-            Write-Host "Isolation: uv manages Python locally instead of using system Python."
-            Write-Host "Validation: uv sync --locked detects dependency changes before launch."
-            Write-Host
-            Write-Host "Python environments and packages stay under .odia/."
-            Write-Host
-
-            for ($Index = 0; $Index -lt $Options.Count; $Index++) {
-                if ($Index -eq $SelectedIndex) {
-                    Write-Host "> $($Labels[$Index])" -ForegroundColor Cyan
-                }
-                else {
-                    Write-Host "  $($Labels[$Index])"
-                }
-            }
-
-            Write-Host
-            Write-Host "Use ↑/↓ and Enter, or press 1-2. Press Q or Ctrl+C to cancel."
-
-            # Read one key immediately without displaying it.
-            $Key = [Console]::ReadKey($true)
-
-            switch ($Key.Key) {
-                "UpArrow" {
-                    if ($SelectedIndex -gt 0) {
-                        $SelectedIndex--
-                    }
-                }
-                "DownArrow" {
-                    if ($SelectedIndex -lt $Options.Count - 1) {
-                        $SelectedIndex++
-                    }
-                }
-                "Enter" { return $Options[$SelectedIndex] }
-                "D1" { return "uv" }
-                "NumPad1" { return "uv" }
-                "D2" { return "conda" }
-                "NumPad2" { return "conda" }
-                "Q" { exit 130 }
-            }
-        }
-    }
-    finally {
-        # Always restore the user's original terminal screen.
-        Write-Host "${Escape}[?1049l" -NoNewline
     }
 }
 
@@ -175,7 +103,7 @@ function Install-Uv {
             "-NoProfile",
             "-ExecutionPolicy", "Bypass",
             "-File", $Installer
-        )
+        ) | Out-Host
     }
     finally {
         Remove-Item $Installer -Force -ErrorAction SilentlyContinue
@@ -311,25 +239,17 @@ function Start-WithConda {
 
 Set-Location $ProjectRoot
 
-if ([string]::IsNullOrWhiteSpace($Manager)) {
-    $Manager = Choose-Manager
+if ($Manager -eq "conda") {
+    [Console]::Error.WriteLine(
+        "Conda setup is temporarily disabled because the uv workflow is verified and working reliably."
+    )
+    [Console]::Error.WriteLine("Use uv while Conda support is reviewed.")
+    exit 2
 }
 
 Write-Host
-Write-Host "Selected: $Manager"
+Write-Host "Selected: uv"
 Write-Host "Preparing the project-local environment..."
 Write-Host
 
-switch ($Manager) {
-    "uv" {
-        Start-WithUv
-    }
-    "conda" {
-        $CondaCommand = Find-Conda
-        if ($null -eq $CondaCommand) {
-            Write-Host "Conda was not found; installing private Miniconda..."
-            $CondaCommand = Install-Miniconda
-        }
-        Start-WithConda $CondaCommand (Join-Path $StateDir "envs\conda")
-    }
-}
+Start-WithUv
